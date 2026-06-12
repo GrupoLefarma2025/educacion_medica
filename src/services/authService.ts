@@ -13,12 +13,12 @@ import type { Area } from '@/types/catalogo.types';
 import type { ApiResponse } from '@/types/api.types';
 
 
-const ACCESS_TOKEN_KEY = 'accessToken';
-const REFRESH_TOKEN_KEY = 'refreshToken';
-const USER_KEY = 'user';
-const EMPRESA_KEY = 'empresa';
-const SUCURSAL_KEY = 'sucursal';
-const AREA_KEY = 'area';
+const ACCESS_TOKEN_KEY = 'edu_med_accessToken';
+const REFRESH_TOKEN_KEY = 'edu_med_refreshToken';
+const USER_KEY = 'edu_med_user';
+const EMPRESA_KEY = 'edu_med_empresa';
+const SUCURSAL_KEY = 'edu_med_sucursal';
+const AREA_KEY = 'edu_med_area';
 
 export const authService = {
   loginStepOne: async (username: string): Promise<LoginStepOneResponse> => {
@@ -69,7 +69,8 @@ export const authService = {
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       localStorage.removeItem(REFRESH_TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
-      localStorage.removeItem('token'); // Legacy token key
+      localStorage.removeItem('token');
+      localStorage.removeItem('accessToken');
 
       // NO borrar configuración de usuario (empresa, sucursal, notificaciones, etc.)
 

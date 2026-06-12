@@ -4,7 +4,6 @@ import { AppRoutes } from './routes/AppRoutes';
 import { useAuthStore } from './store/authStore';
 import { useConfigStore } from './store/configStore';
 import { Toaster } from '@/components/ui/sonner';
-import { AutoVerify } from '@/components/AutoVerify';
 import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 import { setNavigate } from '@/lib/navigation';
 
@@ -32,16 +31,7 @@ function App() {
     }
   }, [tema, setTema]);
 
-  // Iniciar refresh proactivo de token
   useTokenRefresh();
-
-  // Check if autotest mode is enabled
-  const urlParams = new URLSearchParams(window.location.search);
-  const isAutoTest = urlParams.get('autotest') === 'true';
-
-  if (isAutoTest) {
-    return <AutoVerify />;
-  }
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>

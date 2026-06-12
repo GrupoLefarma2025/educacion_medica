@@ -17,7 +17,6 @@ import { Building2, MapPin, Layers, User, LogOut, Sun, Moon, Monitor, PenLine, A
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useState } from 'react';
 import CambiarUbicacionModal from './CambiarUbicacionModal';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 export const Header = () => {
   const { user, empresa, sucursal, area, hasFirma, logout } = useAuthStore();
@@ -123,9 +122,6 @@ export const Header = () => {
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {/* Notification Bell - always visible */}
-        <NotificationBell onError={(error) => console.error('Notification error:', error)} />
 
         {/* User Menu - avatar only (compact) */}
         <DropdownMenu>

@@ -4,28 +4,21 @@ import {
   LayoutDashboard,
   Shield,
   Key,
-  User,
   ChevronRight,
   Database,
   Store,
-  // Wallet,
   Ruler,
   Users,
   CreditCard,
-  FileCheck2,
-  Bell,
   MapPin,
   FileText,
   List,
   Building,
   UserCircle,
+  User,
   LogOut,
-  HelpCircle,
-  GitBranch,
-  ShoppingCart,
-  Receipt,
-  Send,
   Wallet,
+  Receipt,
 } from 'lucide-react';
 
 import {
@@ -90,7 +83,6 @@ const menuItems: SidebarMenuItemConfig[] = [
     icon: Shield,
     isCollapsible: true,
     items: [
-      // { title: 'Usuarios', icon: User, path: '/seguridad/usuarios', permission: { requireAny: ['usuarios.ver_detalle', 'usuarios.manage'] } },
       {
         title: 'Usuarios',
         icon: Users,
@@ -103,8 +95,9 @@ const menuItems: SidebarMenuItemConfig[] = [
         path: '/seguridad/roles',
         permission: { require: 'roles.ver_listado' },
       },
-      { title: 'Permisos', 
-        icon: Key, 
+      {
+        title: 'Permisos',
+        icon: Key,
         path: '/seguridad/permisos',
         permission: { require: 'permisos.ver_listado' },
       },
@@ -115,76 +108,19 @@ const menuItems: SidebarMenuItemConfig[] = [
     icon: Database,
     isCollapsible: true,
     items: [
-      { title: 'Empresas', icon: Building, path: '/catalogos/empresas',
-        permission: { require: 'empresas.ver_listado' }
-       },
-      { title: 'Sucursales', icon: Store, path: '/catalogos/sucursales',
-        permission: { require: 'sucursales.ver_listado' }
-      },
-      { title: 'Áreas', icon: Database, path: '/catalogos/areas',
-        permission: { require: 'areas.ver_listado' }
-      },
-      { title: 'Tipos de Gasto', icon: Wallet, path: '/catalogos/tipos-gasto',
-        permission: { require: 'tipos-gasto.ver_listado' }
-      },
-      { title: 'Medidas', icon: Ruler, path: '/catalogos/medidas',
-        permission: { require: 'medidas.ver_listado' }
-      },
-      { title: 'Formas de Pago', icon: CreditCard, path: '/catalogos/formas-pago',
-        permission: { require: 'formas-pago.ver_listado' }
-      },
-      { title: 'Tipos de Impuesto', icon: Receipt, path: '/catalogos/tipos-impuesto',
-        permission: { require: 'tipos-impuesto.ver_listado' }
-      },
-      { title: 'Centros de Costo', icon: MapPin, path: '/catalogos/centros-costo',
-        permission: { require: 'centros-costo.ver_listado' }
-      },
-      { title: 'Cuentas Contables', icon: FileText, path: '/catalogos/cuentas-contables',
-        permission: { require: 'cuentas-contables.ver_listado' }
-      },
-      { title: 'Estatus de Orden', icon: List, path: '/catalogos/estatus-orden',
-        permission: { require: 'estatus-orden.ver_listado' }
-      },
-      { title: 'Proveedores', icon: Building, path: '/catalogos/proveedores',
-        permission: { require: 'proveedores.ver_listado' }
-      },
-      { title: 'Regímenes Fiscales', icon: UserCircle, path: '/catalogos/regimenes-fiscales',
-        permission: { require: 'regimenes-fiscales.ver_listado' }
-      },
+      { title: 'Empresas', icon: Building, path: '/catalogos/empresas', permission: { require: 'empresas.ver_listado' } },
+      { title: 'Sucursales', icon: Store, path: '/catalogos/sucursales', permission: { require: 'sucursales.ver_listado' } },
+      { title: 'Áreas', icon: Database, path: '/catalogos/area', permission: { require: 'areas.ver_listado' } },
+      { title: 'Tipos de Gasto', icon: Wallet, path: '/catalogos/tipos-gasto', permission: { require: 'tipos-gasto.ver_listado' } },
+      { title: 'Medidas', icon: Ruler, path: '/catalogos/medidas', permission: { require: 'medidas.ver_listado' } },
+      { title: 'Formas de Pago', icon: CreditCard, path: '/catalogos/formas-pago', permission: { require: 'formas-pago.ver_listado' } },
+      { title: 'Tipos de Impuesto', icon: Receipt, path: '/catalogos/tipos-impuesto', permission: { require: 'tipos-impuesto.ver_listado' } },
+      { title: 'Centros de Costo', icon: MapPin, path: '/catalogos/centros-costo', permission: { require: 'centros-costo.ver_listado' } },
+      { title: 'Cuentas Contables', icon: FileText, path: '/catalogos/cuentas-contables', permission: { require: 'cuentas-contables.ver_listado' } },
+      { title: 'Estatus de Orden', icon: List, path: '/catalogos/estatus-orden', permission: { require: 'estatus-orden.ver_listado' } },
+      { title: 'Proveedores', icon: Building, path: '/catalogos/proveedores', permission: { require: 'proveedores.ver_listado' } },
+      { title: 'Regímenes Fiscales', icon: UserCircle, path: '/catalogos/regimenes-fiscales', permission: { require: 'regimenes-fiscales.ver_listado' } },
     ],
-  },
-  {
-    title: 'Órdenes de compra',
-    icon: ShoppingCart,
-    isCollapsible: true,
-    items: [
-      { title: 'Crear orden', icon: FileText, path: '/ordenes/crear',
-        permission: { require: 'ordenes.crear' }
-       },
-      { title: 'Bandeja de autorizaciones', icon: FileCheck2, path: '/ordenes/autorizaciones',
-        permission: { require: 'ordenes.ver_listado' }
-       },
-      { title: 'Concentrado de órdenes', icon: Send, path: '/ordenes/envio-concentrado',
-        permission: { require: 'ordenes.envio_concentrado' }
-      },
-    ],
-  },
-  {
-    title: 'Notificaciones',
-    icon: Bell,
-    path: '/notificaciones',
-    permission: { require: 'notificaciones.ver_listado' },
-  },
-  {
-    title: 'Workflows',
-    icon: GitBranch,
-    path: '/workflows',
-    permission: { require: 'workflows.ver_listado' },
-  },
-  {
-    title: 'Ayuda',
-    icon: HelpCircle,
-    path: '/help',
   },
 ];
 

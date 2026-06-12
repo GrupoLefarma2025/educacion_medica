@@ -18,6 +18,16 @@ import { toast } from 'sonner';
 
 const LEGACY_TOKEN_KEY = 'token';
 
+const LEGACY_TO_EDU_MED_KEYS: Record<string, string> = {
+  'token': 'edu_med_accessToken',
+  'accessToken': 'edu_med_accessToken',
+  'refreshToken': 'edu_med_refreshToken',
+  'user': 'edu_med_user',
+  'empresa': 'edu_med_empresa',
+  'sucursal': 'edu_med_sucursal',
+  'area': 'edu_med_area',
+};
+
 export const useAuthStore = create<AuthState>()((set, get) => ({
   user: null,
   token: null,
@@ -291,12 +301,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   setToken: (token: string) => {
-    localStorage.setItem('accessToken', token);
+    localStorage.setItem('edu_med_accessToken', token);
     set({ token, isAuthenticated: true });
   },
 
   setUser: (user: UserInfo) => {
-    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('edu_med_user', JSON.stringify(user));
     set({ user });
   },
 
@@ -321,7 +331,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         accion: p.accion,
       })),
     };
-    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('edu_med_user', JSON.stringify(user));
     set({ user });
   },
 
@@ -341,11 +351,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   initialize: () => {
-    const legacyToken = localStorage.getItem(LEGACY_TOKEN_KEY);
-    if (legacyToken && !localStorage.getItem('accessToken')) {
-      localStorage.setItem('accessToken', legacyToken);
-      localStorage.removeItem(LEGACY_TOKEN_KEY);
-    }
+    Object.entries(LEGACY_TO_EDU_MED_KEYS).forEach(([oldKey, newKey]) => {
+      const old = localStorage.getItem(oldKey);
+      if (old && !localStorage.getItem(newKey)) {
+        localStorage.setItem(newKey, old);
+        localStorage.removeItem(oldKey);
+      }
+    });
 
     const token = authService.getAccessToken();
     const user = authService.getCurrentUser();
