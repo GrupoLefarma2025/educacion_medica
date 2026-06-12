@@ -1,0 +1,2941 @@
+﻿import { Fragment, useEffect, useMemo, useCallback, useRef, useState } from 'react';
+
+import { createPortal } from 'react-dom';
+import {useNavigate, useSearchParams } from 'react-router-dom';
+import { usePageTitle } from '@/hooks/usePageTitle';
+import { usePermission } from '@/hooks/usePermission';
+import { API } from '@/services/api';
+import type { ApiResponse } from '@/types/api.types';
+import { DataTable } from '@/components/ui/data-table';
+import type { ColumnDef } from '@/components/ui/data-table';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Modal } from '@/components/ui/modal';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+} from '@/components/kibo-ui/combobox';
+import {
+  Loader2,
+  FileText,
+  Search,
+  RefreshCcw,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  X,
+  Paperclip,
+  Eye,
+  Download,
+  Clock,
+  AlertCircle,
+  XCircle,
+  AlertTriangle,
+  UserRound,
+  Printer,
+  MoveRight,
+  Send,
+  RotateCcw,
+  Receipt,
+  Banknote,
+  Upload,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
+import type { Archivo, ArchivoListItem } from '@/types/archivo.types';
+import type { FormaPago, ProveedorCuentaBancaria } from '@/types/catalogo.types';
+import { FileUploader } from '@/components/archivos/FileUploader';
+import { FileViewer } from '@/components/archivos/FileViewer';
+import { archivoService } from '@/services/archivoService';
+import { toast } from 'sonner';
+import type { OrdenCompraResponse  } from '@/types/ordenCompra.types';
+import type { WorkflowEstado } from '@/types/workflow.types';
+import type { ComprobanteResponse, PartidaPendienteResponse, } from '@/types/comprobante.types';
+import type { Usuario } from '@/types/usuario.types';
+import { comprobanteService } from '@/services/comprobanteService';
+import { SubirComprobanteModal } from '@/components/facturas/SubirComprobanteModal';
+import { SubirComprobantePagoModal } from '@/components/facturas/SubirComprobantePagoModal';
+import { FlujoOrdenPDF } from '@/components/ordenes/FlujoOrdenPDF';
+import type { ProgresoPasoPDF, HistorialPDFItem, PasoPDFConfig } from '@/components/ordenes/FlujoOrdenPDF';
+import { OrdenCompraPDF } from '@/components/ordenes/OrdenCompraPDF';
+import { toApiError } from '@/utils/errors';
+
+interface AccionDisponibleResponse {
+  idAccion: number;
+  idTipoAccion: number;
+  tipoAccionCodigo?: string;
+  tipoAccionNombre?: string;
+  tipoAccionCambiaEstado?: boolean;
+  enviaConcentrado?: boolean;
+
+  // Requisitos del paso
+  requiereComentario: boolean;
+  requiereAdjunto: boolean;
+  permiteAdjunto: boolean;
+
+  // Handlers y campos para modal dinámico
+  handlers: AccionHandlerResponse[];
+  camposWorkflow: WorkflowCampoResponse[];
+  camposRequeridos: string[];
+}
+
+interface AccionHandlerResponse {
+  idHandler: number;
+  handlerKey: string;
+  requerido: boolean;
+  configuracionJson?: string | null;
+  ordenEjecucion: number;
+  campo?: WorkflowCampoResponse | null;
+  validacionExito?: boolean | null;
+  validacionMensaje?: string | null;
+}
+
+interface WorkflowCampoResponse {
+  idWorkflowCampo: number;
+  nombreTecnico: string;
+  etiquetaUsuario: string;
+  tipoControl: string;
+  sourceCatalog?: string | null;
+}
+
+interface HistorialWorkflowItemResponse {
+  idEvento: number;
+  idOrden: number;
+  idPaso: number;
+  nombrePaso?: string | null;
+  idAccion: number;
+  nombreAccion?: string | null;
+  idUsuario: number;
+  nombreUsuario?: string | null;
+  comentario?: string | null;
+  datosSnapshot?: string | null;
+  fechaEvento: string;
+}
+
+interface WorkflowListItem {
+  idWorkflow: number;
+  codigoProceso: string;
+  nombre: string;
+}
+
+interface WorkflowHandlerConfig {
+  idHandler: number;
+  handlerKey: string;
+  requerido: boolean;
+  configuracionJson?: string | null;
+  ordenEjecucion: number;
+  activo: boolean;
+  idWorkflowCampo?: number | null;
+  campo?: WorkflowCampoConfig | null;
+}
+
+interface WorkflowAccionConfig {
+  idAccion: number;
+  nombreAccion: string;
+  idTipoAccion: number;
+  tipoAccionCodigo?: string;
+  tipoAccionNombre?: string;
+  tipoAccionCambiaEstado?: boolean;
+  handlers: WorkflowHandlerConfig[];
+}
+
+interface WorkflowCampoConfig {
+  idWorkflowCampo: number;
+  nombreTecnico: string;
+  etiquetaUsuario: string;
+  tipoControl: string; // 'Texto' | 'Numero' | 'Booleano' | 'Checkbox' | 'Selector' | 'Fecha' | 'Archivo'
+  sourceCatalog?: string | null;
+  propiedadEntidad?: string | null;
+  validarFiscal?: boolean;
+  activo: boolean;
+}
+
+interface Proveedor {
+  idProveedor: number;
+  razonSocial: string;
+  rfc?: string;
+  codigoPostal?: string;
+  regimenFiscalId?: number;
+  regimenFiscalDescripcion?: string;
+  usoCfdi?: string;
+  sinDatosFiscales?: boolean;
+  detalle?: {
+    personaContactoNombre?: string;
+    contactoTelefono?: string;
+    contactoEmail?: string;
+  };
+  cuentasFormaPago?: ProveedorCuentaBancaria[];
+}
+
+interface WorkflowPasoConfig {
+  idPaso: number;
+  orden: number;
+  nombrePaso: string;
+  descripcionAyuda?: string | null;
+  esInicio: boolean;
+  esFinal: boolean;
+  requiereComentario: boolean;
+  requiereAdjunto: boolean;
+  permiteAdjunto: boolean;
+  acciones: WorkflowAccionConfig[];
+}
+
+interface WorkflowConfigResponse {
+  idWorkflow: number;
+  codigoProceso: string;
+  pasos: WorkflowPasoConfig[];
+  campos: WorkflowCampoConfig[];
+}
+
+interface WorkflowFlowResponse {
+  idWorkflow: number;
+  nombre: string;
+  codigoProceso: string;
+  version: number;
+  activo: boolean;
+  pasos: WorkflowPasoFlowResponse[];
+}
+
+interface WorkflowPasoFlowResponse {
+  idPaso: number;
+  orden: number;
+  nombrePaso: string;
+  idEstado?: number;
+  descripcionAyuda?: string | null;
+  esInicio: boolean;
+  esFinal: boolean;
+  activo: boolean;
+  requiereFirma: boolean;
+  requiereComentario: boolean;
+  requiereAdjunto: boolean;
+  permiteAdjunto: boolean;
+}
+
+type CampoFormItem = { campo: WorkflowCampoConfig; requerido: boolean; inputKey: string; validacionExito?: boolean | null; validacionMensaje?: string | null };
+
+function getCamposParaAccion(accion: AccionDisponibleResponse | null): CampoFormItem[] {
+  if (!accion) return [];
+  const result: CampoFormItem[] = [];
+  const seen = new Set<string>();
+
+  const handlers = [...(accion.handlers || [])]
+    .sort((a, b) => a.ordenEjecucion - b.ordenEjecucion);
+
+  for (const handler of handlers) {
+    try {
+      // Field: input/selector/checkbox — requerido viene del handler (valida Y guarda)
+      if (handler.handlerKey === 'Field' && handler.campo) {
+        const inputKey = handler.campo.nombreTecnico;
+        if (!seen.has(inputKey)) {
+          seen.add(inputKey);
+          result.push({ 
+            campo: {
+              idWorkflowCampo: handler.campo.idWorkflowCampo,
+              nombreTecnico: handler.campo.nombreTecnico,
+              etiquetaUsuario: handler.campo.etiquetaUsuario,
+              tipoControl: handler.campo.tipoControl,
+              sourceCatalog: handler.campo.sourceCatalog,
+              activo: true
+            }, 
+            requerido: handler.requerido, 
+            inputKey 
+          });
+        }
+      }
+
+      // Document: campo tipo Archivo (comprobante_pago, comprobante_gasto/factura)
+      if (handler.handlerKey === 'Document' && handler.campo) {
+        const inputKey = handler.campo.nombreTecnico;
+        if (!seen.has(inputKey)) {
+          seen.add(inputKey);
+          result.push({ 
+            campo: {
+              idWorkflowCampo: handler.campo.idWorkflowCampo,
+              nombreTecnico: handler.campo.nombreTecnico,
+              etiquetaUsuario: handler.campo.etiquetaUsuario,
+              tipoControl: handler.campo.tipoControl,
+              sourceCatalog: handler.campo.sourceCatalog,
+              activo: true
+            }, 
+            requerido: handler.requerido, 
+            inputKey 
+          });
+        }
+      }
+
+      // Alerta: muestra mensaje de validacion (ej: proveedor no autorizado)
+      if (handler.campo?.tipoControl === 'Alerta') {
+        const inputKey = handler.campo.nombreTecnico;
+        if (!seen.has(inputKey)) {
+          seen.add(inputKey);
+          result.push({
+            campo: {
+              idWorkflowCampo: handler.campo.idWorkflowCampo,
+              nombreTecnico: handler.campo.nombreTecnico,
+              etiquetaUsuario: handler.campo.etiquetaUsuario,
+              tipoControl: 'Alerta',
+              sourceCatalog: null,
+              activo: true
+            },
+            requerido: false,
+            inputKey,
+            validacionExito: handler.validacionExito,
+            validacionMensaje: handler.validacionMensaje
+          });
+        }
+      }
+    } catch {
+      /* handler sin campo o JSON inválido */
+    }
+  }
+  return result;
+}
+
+// ── helpers de formato ──────────────────────────────────────────────────────
+const fmtFecha = (dateStr: string | null | undefined) => {
+  if (!dateStr) return '-';
+  try {
+    return new Date(dateStr).toLocaleDateString('es-MX', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+  } catch {
+    return dateStr;
+  }
+};
+
+export default function AutorizacionesOC() {
+  usePageTitle('Autorizaciones OC', 'Bandeja de firmas y detalle de autorización');
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const idOrdenParam = searchParams.get('idOrden') ? Number(searchParams.get('idOrden')) : null;
+
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [ordenes, setOrdenes] = useState<OrdenCompraResponse[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(idOrdenParam);
+  const [selectedOrden, setSelectedOrden] = useState<OrdenCompraResponse | null>(null);
+  const [acciones, setAcciones] = useState<AccionDisponibleResponse[]>([]);
+  const [historial, setHistorial] = useState<HistorialWorkflowItemResponse[]>([]);
+  const [workflowsMap, setWorkflowsMap] = useState<Map<number, WorkflowFlowResponse>>(new Map());
+  const [pasosWorkflow, setPasosWorkflow] = useState<WorkflowPasoFlowResponse[]>([]);
+  const [expandedPasoId, setExpandedPasoId] = useState<number | null>(null);
+  const [expandedPartidaId, setExpandedPartidaId] = useState<number | null>(null);
+  const pasosContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const [search, setSearch] = useState('');
+  const [creadorFilter, setCreadorFilter] = useState<number | 'all'>('all');
+  const [estadoFilter, setEstadoFilter] = useState('all');
+  const [isFirmarModalOpen, setIsFirmarModalOpen] = useState(false);
+  const [isSubmittingFirma, setIsSubmittingFirma] = useState(false);
+  const [accionSeleccionada, setAccionSeleccionada] = useState<AccionDisponibleResponse | null>(
+    null
+  );
+  const [comentarioFirma, setComentarioFirma] = useState('');
+  // Dynamic campo values for the action modal (key = inputKey from handler config)
+  const [camposValues, setCamposValues] = useState<Record<string, unknown>>({});
+  const [catalogos, setCatalogos] = useState<Record<string, { value: string; label: string }[]>>(
+    {}
+  );
+  const [loadingCatalogos, setLoadingCatalogos] = useState(false);
+  // File upload for DocumentRequired handlers
+  const [archivoSubidos, setArchivoSubidos] = useState<Record<string, Archivo[]>>({});
+  // Free-form adjuntos for steps with permite_adjunto=true
+  const [adjuntosLibres, setAdjuntosLibres] = useState<Archivo[]>([]);
+  // Archivos adjuntos de la orden seleccionada
+  const [archivosOrden, setArchivosOrden] = useState<ArchivoListItem[]>([]);
+  const [loadingArchivos, setLoadingArchivos] = useState(false);
+  const [viewerArchivoId, setViewerArchivoId] = useState<number | null>(null);
+
+  // Facturación tab state
+  const [partidasPendientes, setPartidasPendientes] = useState<PartidaPendienteResponse[]>([]);
+  const [partidasPendientesPago, setPartidasPendientesPago] = useState<PartidaPendienteResponse[]>([]);
+  const [loadingFacturacion, setLoadingFacturacion] = useState(false);
+  const [isSubirComprobanteOpen, setIsSubirComprobanteOpen] = useState(false);
+  const [isSubirComprobantePagoOpen, setIsSubirComprobantePagoOpen] = useState<string | null>(null);
+  const [isSubirAdjuntoOpen, setIsSubirAdjuntoOpen] = useState(false);
+  const [observacionesAdjunto, setObservacionesAdjunto] = useState('');
+  const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
+
+  const [comprobantesWorkflow, setComprobantesWorkflow] = useState<Record<string, import('@/types/comprobante.types').ComprobanteResponse[]>>({});
+  const [proveedoresMap, setProveedoresMap] = useState<Map<number, Proveedor>>(new Map());
+  const [allProveedoresMap, setAllProveedoresMap] = useState<Map<number, Proveedor>>(new Map());
+  const [loadingProveedores, setLoadingProveedores] = useState(false);
+  const [firmasMap, setFirmasMap] = useState<Map<number, string>>(new Map());
+  const [workflowEstados, setWorkflowEstados] = useState<WorkflowEstado[]>([]);
+  const [formasPagoMap, setFormasPagoMap] = useState<Map<number, FormaPago>>(new Map());
+
+  //Permisos
+  const puedeVerTodas = usePermission({ require: 'orden_compra.puede_ver_todas_las_ordenes' });
+
+  const estados = useMemo(() => {
+    const values = workflowEstados.filter(e => e.activo).sort((a, b) => a.idEstado - b.idEstado);
+    return ['all', ...values.map(e => String(e.idEstado))];
+  }, [workflowEstados]);
+
+  const creadores = useMemo(() => {
+    const map = new Map<number, string>();
+    ordenes.forEach((o) => {
+      if (o.idUsuarioCreador && o.solicitanteNombre) {
+        map.set(o.idUsuarioCreador, o.solicitanteNombre);
+      }
+    });
+    return Array.from(map.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([id, nombre]) => ({ id, nombre }));
+  }, [ordenes]);
+
+  const getEstadoInfo = (idEstado: number | null | undefined) => {
+    if (idEstado == null) return { nombre: 'Desconocido', color: '#94a3b8' };
+    const e = workflowEstados.find((est) => est.idEstado === idEstado);
+    return { nombre: e?.nombre ?? `Estado ${idEstado}`, color: e?.colorHex ?? '#94a3b8' };
+  };
+  const formatCurrency = (value: number) =>
+    value.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+
+  const fetchOrdenes = useCallback(async () => {
+    try {
+      const res = await API.get<ApiResponse<OrdenCompraResponse[]>>('/ordenes');
+      const data = res.data.data || [];
+      setOrdenes(data);
+    } catch (error: unknown) {
+      const err = toApiError(error);
+      toast.error(err.message ?? 'Error al cargar bandeja de órdenes');
+    }
+  }, []);
+
+  const obtenerProveedorPorId = async (id: number): Promise<Proveedor | null> => {
+    try {
+      const response = await API.get<ApiResponse<Proveedor>>(`/catalogos/Proveedores/${id}`);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      return null;
+    } catch (err) {
+      console.warn(`Error al obtener proveedor ${id}:`, err);
+      return null;
+    }
+  };
+
+  const cargarProveedoresOrden = async (orden: OrdenCompraResponse) => {
+    setLoadingProveedores(true);
+    const nuevosProveedores = new Map<number, Proveedor>();
+
+    try {
+      const idsProveedores: number[] = [];
+
+      if (orden.idProveedor && orden.idProveedor > 0) {
+        idsProveedores.push(orden.idProveedor);
+      }
+
+      orden.partidas.forEach((p) => {
+        if (p.idProveedor && p.idProveedor > 0 && !idsProveedores.includes(p.idProveedor)) {
+          idsProveedores.push(p.idProveedor);
+        }
+      });
+
+      await Promise.all(
+        idsProveedores.map(async (id) => {
+          const proveedor = await obtenerProveedorPorId(id);
+          if (proveedor) {
+            nuevosProveedores.set(id, proveedor);
+          }
+        })
+      );
+    } finally {
+      setProveedoresMap(nuevosProveedores);
+      setLoadingProveedores(false);
+    }
+  };
+
+  const fetchFirmasUsuarios = async (historialData: HistorialWorkflowItemResponse[]) => {
+    try {
+      const userIds = [...new Set(historialData.map(h => h.idUsuario).filter(id => id > 0))];
+
+      if (userIds.length === 0) {
+        setFirmasMap(new Map());
+        return;
+      }
+
+      const baseUrl = import.meta.env.VITE_API_URL || window.location.origin;
+      const apiUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+
+      const newFirmasMap = new Map<number, string>();
+      userIds.forEach(userId => {
+        newFirmasMap.set(userId, `${apiUrl}/media/archivos/firmas_usuarios/${userId}.png?t=${Date.now()}`);
+      });
+
+      setFirmasMap(newFirmasMap);
+    } catch {
+      setFirmasMap(new Map());
+    }
+  };
+
+  const fetchDetalle = async (idOrden: number) => {
+    try {
+      setLoadingDetail(true);
+      const [ordenRes, accionesRes, historialRes] = await Promise.all([
+        API.get<ApiResponse<OrdenCompraResponse>>(`/ordenes/${idOrden}`),
+        API.get<ApiResponse<AccionDisponibleResponse[]>>(`/ordenes/${idOrden}/acciones`).catch(
+          (err) => {
+            return { data: { data: [] } } as { data: { data: AccionDisponibleResponse[] } };
+          }
+        ),
+        API.get<ApiResponse<HistorialWorkflowItemResponse[]>>(
+          `/ordenes/${idOrden}/historial-workflow`
+        ).catch((): { data: { data: [] } } => ({ data: { data: [] } })),
+      ]);
+
+      const orden = ordenRes.data.data || null;
+      setSelectedOrden(orden);
+      setAcciones(accionesRes.data?.data || []);
+      setHistorial(historialRes.data?.data || []);
+
+      const historialData = historialRes.data?.data || [];
+      console.log(`Bitacora de oriden ${idOrden} :`, historialData);
+
+      await Promise.all([
+        orden ? cargarProveedoresOrden(orden) : Promise.resolve(),
+        fetchFirmasUsuarios(historialData),
+        fetchArchivosOrden(idOrden),
+        fetchPartidasPendientes(idOrden),
+      ]);
+    } catch (error: unknown) {
+      const err = toApiError(error);
+      toast.error(err.message ?? 'Error al cargar detalle de orden');
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const fetchArchivosOrden = async (idOrden: number) => {
+    try {
+      setLoadingArchivos(true);
+      const archivos = await archivoService.getAll({
+        entidadTipo: 'OrdenCompra',
+        entidadId: idOrden,
+        soloActivos: true,
+      });
+      setArchivosOrden(archivos);
+    } catch {
+      setArchivosOrden([]);
+    } finally {
+      setLoadingArchivos(false);
+    }
+  };
+
+  const handleEliminarArchivo = async (idArchivo: number) => {
+    if (!window.confirm('¿Deseas borrar este archivo?')) return;
+    try {
+      await archivoService.delete(idArchivo);
+      toast.success('Archivo borrado correctamente');
+      if (selectedOrden) {
+        fetchArchivosOrden(selectedOrden.idOrden);
+      }
+    } catch {
+      toast.error('Error al borrar el archivo');
+    }
+  };
+
+  const handleBorrarTodosComprobantes = async (categoria: 'gasto' | 'pago') => {
+    const label = categoria === 'gasto' ? 'gasto' : 'pago';
+    if (!window.confirm(`¿Deseas borrar TODOS los comprobantes de ${label} para esta orden? Se revertirán todas las asignaciones a las partidas. Esta acción no se puede deshacer.`)) return;
+    try {
+      await comprobanteService.eliminarPorOrden(selectedOrden!.idOrden, categoria);
+      toast.success(`Comprobantes de ${label} borrados correctamente`);
+      // Refrescar datos
+      fetchPartidasPendientes(selectedOrden!.idOrden);
+      fetchArchivosOrden(selectedOrden!.idOrden);
+    } catch {
+      toast.error(`Error al borrar los comprobantes de ${label}`);
+    }
+  };
+
+  const fetchPartidasPendientes = async (idOrden: number) => {
+    try {
+      setLoadingFacturacion(true);
+      const [gasto, pago] = await Promise.all([
+        comprobanteService.getPartidasPendientes(idOrden, 'gasto'),
+        comprobanteService.getPartidasPendientes(idOrden, 'pago'),
+      ]);
+      setPartidasPendientes(gasto);
+      setPartidasPendientesPago(pago);
+    } catch {
+      setPartidasPendientes([]);
+      setPartidasPendientesPago([]);
+    } finally {
+      setLoadingFacturacion(false);
+    }
+  };
+
+  const fetchAllWorkflowsFlow = async () => {
+    try {
+      const res = await API.get<ApiResponse<WorkflowFlowResponse[]>>('/config/workflows/flow');
+      if (res.data?.success && res.data.data) {
+        const map = new Map<number, WorkflowFlowResponse>();
+        for (const w of res.data.data) {
+          map.set(w.idWorkflow, w);
+        }
+        setWorkflowsMap(map);
+      }
+    } catch {
+      setWorkflowsMap(new Map());
+    }
+  };
+
+  const applyWorkflowToState = (idWorkflow?: number | null) => {
+    if (!idWorkflow) {
+      setPasosWorkflow([]);
+      return;
+    }
+    const workflow = workflowsMap.get(idWorkflow);
+    if (workflow) {
+      const pasos = (workflow.pasos || []).filter(p => p.activo).sort((a, b) => a.orden - b.orden);
+      setPasosWorkflow(pasos);
+    } else {
+      setPasosWorkflow([]);
+    }
+  };
+
+  const fetchEstados = async () => {
+    try {
+      const res = await API.get<ApiResponse<WorkflowEstado[]>>('/config/workflows/estados');
+      if (res.data?.success) {
+        setWorkflowEstados(res.data.data || []);
+      }
+    } catch {
+      // silent fail
+    }
+  };
+
+  // Helper to get formaPago ID regardless of casing (backend uses IdFormaPago/PascalCase)
+  const getFormaPagoId = (fp: Record<string, unknown>): number => {
+    return (fp.idFormaPago ?? fp.IdFormaPago) as number;
+  };
+
+  // Helper to get formaPago nombre regardless of casing
+  const getFormaPagoNombre = (fp: Record<string, unknown>): string => {
+    return (fp.nombre ?? fp.Nombre ?? 'Sin nombre') as string;
+  };
+
+  const fetchFormasPago = async () => {
+    try {
+      const res = await API.get<ApiResponse<FormaPago[]>>('/catalogos/FormasPago');
+      if (res.data?.success && res.data.data) {
+        const map = new Map<number, FormaPago>();
+        for (const fp of res.data.data) {
+          const fpRecord = fp as unknown as Record<string, unknown>;
+          // Transform from PascalCase (backend) to camelCase (frontend type)
+          const transformed: FormaPago = {
+            idFormaPago: getFormaPagoId(fpRecord),
+            nombre: getFormaPagoNombre(fpRecord),
+          } as FormaPago;
+          map.set(transformed.idFormaPago, transformed);
+        }
+        setFormasPagoMap(map);
+      }
+    } catch {
+      // silent fail
+    }
+  };
+
+  const fetchAllProveedores = async () => {
+    try {
+      const res = await API.get<ApiResponse<Proveedor[]>>('/catalogos/Proveedores');
+      if (res.data?.success && res.data.data) {
+        const map = new Map<number, Proveedor>();
+        for (const p of res.data.data) {
+          map.set(p.idProveedor, p);
+        }
+        setAllProveedoresMap(map);
+      }
+    } catch {
+      // silent fail
+    }
+  };
+
+  useEffect(() => {
+  const cargarDatos = async () => {
+    try {
+      // Promise.all dispara todas las peticiones al mismo tiempo
+      await Promise.all([
+        fetchEstados(),
+        fetchAllWorkflowsFlow(),
+        fetchFormasPago(),
+        fetchAllProveedores(),
+      ]);
+
+      await fetchOrdenes()
+      console.log("¡Todo cargado!");
+    } catch (error) {
+      console.error("Error al cargar los datos:", error);
+    }
+  };
+
+  cargarDatos();
+}, [fetchOrdenes]);
+
+  useEffect(() => {
+    if (selectedId != null) fetchDetalle(selectedId);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (selectedId != null) {
+      setIsDetailDrawerOpen(true);
+    } else {
+      setIsDetailDrawerOpen(false);
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedOrden) {
+      setPasosWorkflow([]);
+      return;
+    }
+    setExpandedPasoId(selectedOrden.idPasoActual ?? null);
+    setExpandedPartidaId(null);
+    if (selectedOrden.idWorkflow) {
+      applyWorkflowToState(selectedOrden.idWorkflow);
+    }
+  }, [selectedOrden, workflowsMap]);
+
+  const abrirModalFirma = async (accion: AccionDisponibleResponse) => {
+    setAccionSeleccionada(accion);
+    setComentarioFirma('');
+
+    // Pre-populate campos with existing values from the order
+    const campos = getCamposParaAccion(accion);
+    const initialValues: Record<string, unknown> = {};
+    if (selectedOrden) {
+      const ordenAny = selectedOrden as unknown as Record<string, unknown>;
+      // Convert snake_case nombreTecnico to camelCase for lookup in the TS response object
+      const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+      for (const { campo, inputKey } of campos) {
+        const existing =
+          ordenAny[campo.nombreTecnico] ?? ordenAny[snakeToCamel(campo.nombreTecnico)];
+        if (existing !== undefined && existing !== null) {
+          initialValues[inputKey] = existing;
+        } else if (campo.tipoControl === 'Booleano' || campo.tipoControl === 'Checkbox') {
+          initialValues[inputKey] = false;
+        }
+      }
+    }
+    setCamposValues(initialValues);
+    setArchivoSubidos({});
+    setAdjuntosLibres([]);
+
+    // Fetch catalogs for Selector campos that aren't already loaded
+    const selectorCampos = campos.filter(
+      (c) => c.campo.tipoControl === 'Selector' && c.campo.sourceCatalog
+    );
+    if (selectorCampos.length > 0) {
+      setLoadingCatalogos(true);
+      const fetches = selectorCampos
+        .filter((c) => !catalogos[c.campo.sourceCatalog!])
+        .map(async ({ campo }) => {
+          try {
+            const res = await API.get<ApiResponse<Record<string, unknown>[]>>(campo.sourceCatalog!);
+            const items = res.data.data || [];
+            const LABEL_KEYS = ['nombre', 'name', 'etiqueta', 'label', 'titulo'];
+            const normalized = items
+              .map((item) => {
+                // Find numeric id field (e.g. idCentroCosto, idArea, id, ...)
+                const idKey = Object.keys(item).find(
+                  (k) => /^id/i.test(k) && typeof item[k] === 'number'
+                );
+                // Special case: if item has 'cuenta' field, combine with descripcion
+                const labelValue =
+                  'cuenta' in item
+                    ? `${item['cuenta']}${'descripcion' in item ? ` — ${item['descripcion']}` : ''}`
+                    : (() => {
+                        const labelKey =
+                          Object.keys(item).find((k) => LABEL_KEYS.includes(k.toLowerCase())) ??
+                          Object.keys(item).find((k) => k.toLowerCase() === 'descripcion');
+                        return labelKey ? String(item[labelKey]) : '';
+                      })();
+                return {
+                  value: idKey ? String(item[idKey]) : '',
+                  label: labelValue,
+                };
+              })
+              .filter((i) => i.value && i.label);
+            setCatalogos((prev) => ({ ...prev, [campo.sourceCatalog!]: normalized }));
+          } catch {
+            /* silencio: campo quedará como texto libre */
+          }
+        });
+      Promise.all(fetches).finally(() => setLoadingCatalogos(false));
+    }
+
+    // Cargar comprobantes ya existentes para campos Archivo (subidos desde el tab)
+    const archivoCampos = campos.filter(c => c.campo.tipoControl === 'Archivo');
+    if (archivoCampos.length > 0 && selectedOrden) {
+      try {
+        const [resGasto, resPago] = await Promise.all([
+          API.get<ApiResponse<PartidaPendienteResponse[]>>(`/facturas/partidas-pendientes?idOrden=${selectedOrden.idOrden}&categoria=gasto`),
+          API.get<ApiResponse<PartidaPendienteResponse[]>>(`/facturas/partidas-pendientes?idOrden=${selectedOrden.idOrden}&categoria=pago`),
+        ]);
+        const tieneGasto = (resGasto.data?.data ?? []).some(p => p.importeFacturado > 0);
+        const tienePago = (resPago.data?.data ?? []).some(p => p.importeFacturado > 0);
+        if (tieneGasto) {
+          setComprobantesWorkflow(prev => ({
+            ...prev,
+            comprobante_gasto: [{ idComprobante: 0 } as ComprobanteResponse],
+          }));
+        }
+        if (tienePago) {
+          setComprobantesWorkflow(prev => ({
+            ...prev,
+            comprobante_pago: [{ idComprobante: 0 } as ComprobanteResponse],
+          }));
+        }
+      } catch { /* silent */ }
+    }
+
+    setIsFirmarModalOpen(true);
+  };
+
+  const cerrarModalFirma = () => {
+    // Limpiar archivos de comprobante_pago que quedaron subidos pero la firma fue cancelada
+    const archivosParaEliminar = Object.values(archivoSubidos).flat();
+    if (archivosParaEliminar.length > 0) {
+      archivosParaEliminar.forEach((a) => {
+        archivoService.delete(a.id).catch(() => {
+          // silencioso — el archivo queda huérfano pero no bloquea el flujo
+        });
+      });
+    }
+    setIsFirmarModalOpen(false);
+    setAccionSeleccionada(null);
+    setComentarioFirma('');
+    setArchivoSubidos({});
+    setAdjuntosLibres([]);
+    setComprobantesWorkflow({});
+  };
+
+  const esRechazo = accionSeleccionada?.tipoAccionCodigo === 'RECHAZAR' || accionSeleccionada?.tipoAccionCodigo === 'CANCELAR' ;
+  const esRetorno = accionSeleccionada?.tipoAccionCodigo === 'DEVOLVER';
+  const colorAccion = esRechazo
+    ? 'text-red-600'
+    : esRetorno
+      ? 'text-amber-600'
+      : 'text-emerald-600';
+  const bgAccion = esRechazo
+    ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800'
+    : esRetorno
+      ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800'
+      : 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800';
+
+  // Dynamic campos for the modal based on the selected action's handlers
+  const camposParaAccion = useMemo(
+    () => getCamposParaAccion(accionSeleccionada),
+    [accionSeleccionada]
+  );
+
+  const enviarFirma = async () => {
+    if (!selectedOrden || !accionSeleccionada) return;
+    setIsSubmittingFirma(true);
+    try {
+      const datosAdicionales: Record<string, unknown> = {};
+
+      // Validate required campos and build datosAdicionales dynamically
+      for (const { campo, requerido, inputKey } of camposParaAccion) {
+        if (campo.tipoControl === 'Archivo') {
+          if (requerido) {
+            const tieneArchivo = !!archivoSubidos[inputKey]?.length;
+            const tieneComprobante = (comprobantesWorkflow[inputKey]?.length ?? 0) > 0;
+            if (!tieneArchivo && !tieneComprobante) {
+              toast.error(`Debes adjuntar: ${campo.etiquetaUsuario}`);
+              setIsSubmittingFirma(false);
+              return;
+            }
+          }
+          continue;
+        }
+
+        if (campo.tipoControl === 'Archivo') {
+          const comprobantes = comprobantesWorkflow[inputKey] ?? [];
+          for (const comp of comprobantes) {
+            const tieneAsignaciones = comp.conceptos?.some(
+              (c: { cantidadAsignada?: number; importeAsignado?: number }) =>
+                (c.cantidadAsignada ?? 0) > 0 || (c.importeAsignado ?? 0) > 0
+            );
+            if (!tieneAsignaciones) {
+              toast.error(`El comprobante ${comp.nombreEmisor ?? comp.tipoComprobante?.toUpperCase() ?? 'sin nombre'} no tiene asignaciones. Debes asignarlo antes de firmar.`);
+              setIsSubmittingFirma(false);
+              return;
+            }
+          }
+        }
+        const val = camposValues[inputKey];
+        const isEmpty = val === undefined || val === null || val === '';
+        if (requerido && isEmpty) {
+          toast.error(`${campo.etiquetaUsuario} es obligatorio`);
+          setIsSubmittingFirma(false);
+          return;
+        }
+        if (!isEmpty) datosAdicionales[inputKey] = val;
+      }
+
+      // Add content type from last uploaded file (for SmartAudit)
+      const archivosList = Object.values(archivoSubidos).flat();
+      if (archivosList.length > 0) {
+        datosAdicionales['archivoContentType'] = archivosList[0].tipoMime;
+      }
+
+      if ((esRechazo || esRetorno) && !comentarioFirma.trim()) {
+        toast.error('Para rechazo o devolución el comentario es obligatorio');
+        setIsSubmittingFirma(false);
+        return;
+      }
+
+      // Validate requiereAdjunto from action config
+      if (accionSeleccionada?.requiereAdjunto && adjuntosLibres.length === 0) {
+        toast.error('Debes adjuntar al menos un documento para esta acción');
+        setIsSubmittingFirma(false);
+        return;
+      }
+
+      await API.post(`/ordenes/${selectedOrden.idOrden}/firmar`, {
+        idAccion: accionSeleccionada.idAccion,
+        comentario: comentarioFirma || null,
+        datosAdicionales: Object.keys(datosAdicionales).length > 0 ? datosAdicionales : null,
+      });
+
+      toast.success(`Acción "${accionSeleccionada.tipoAccionNombre}" ejecutada correctamente`);
+      cerrarModalFirma();
+      await Promise.all([fetchOrdenes(), fetchDetalle(selectedOrden.idOrden)]);
+    } catch (error: unknown) {
+      const err = toApiError(error);
+      const errorMessage =
+        err.errors?.[0]?.description ?? err.message ?? 'No fue posible procesar la firma';
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmittingFirma(false);
+    }
+  };
+
+  const textoBotonConfirmar = accionSeleccionada
+    ? `Confirmar ${accionSeleccionada.tipoAccionNombre?.toLowerCase()}`
+    : 'Confirmar';
+
+  const pasosMap = useMemo(
+    () => new Map(pasosWorkflow.map((paso) => [paso.idPaso, paso])),
+    [pasosWorkflow]
+  );
+
+  const currentPasoOrden = useMemo(() => {
+    if (!selectedOrden?.idPasoActual) return null;
+    return pasosMap.get(selectedOrden.idPasoActual)?.orden ?? null;
+  }, [selectedOrden?.idPasoActual, pasosMap]);
+
+  // Current paso config — has permiteAdjunto / requiereAdjunto
+  const currentPaso = useMemo(
+    () => (selectedOrden?.idPasoActual != null ? (pasosMap.get(selectedOrden.idPasoActual) ?? null) : null),
+    [selectedOrden?.idPasoActual, pasosMap]
+  );
+
+  const getTipoEvento = (item: HistorialWorkflowItemResponse) => {
+    const actionName = (item.nombreAccion || '').toLowerCase();
+    if (actionName.includes('rechaz')) return 'rechazo';
+    if (actionName.includes('devol') || actionName.includes('retorn')) return 'retorno';
+    if (
+      actionName.includes('autor') ||
+      actionName.includes('enviar') ||
+      actionName.includes('marcar')||
+      actionName.includes('aprob')
+    )
+      return 'autorizacion';
+    return 'otro';
+  };
+
+  const progresoPasos = useMemo(() => {
+    if (!pasosWorkflow.length) return [];
+    const pasoActualConfig = selectedOrden?.idPasoActual
+      ? pasosMap.get(selectedOrden.idPasoActual)
+      : null;
+    const flujoFinalizado = Boolean(pasoActualConfig?.esFinal);
+    const eventosPorPasoLocal = new Map<number, HistorialWorkflowItemResponse[]>();
+    const pasosCompletados = new Set<number>();
+    for (const item of historial) {
+      const arr = eventosPorPasoLocal.get(item.idPaso) ?? [];
+      arr.push(item);
+      eventosPorPasoLocal.set(item.idPaso, arr);
+
+      // Extraer idPasoAnterior del snapshot para saber qué pasos fueron completados
+      if (item.datosSnapshot) {
+        try {
+          const snapshot = JSON.parse(item.datosSnapshot);
+          if (snapshot.idPasoAnterior) {
+            pasosCompletados.add(snapshot.idPasoAnterior);
+          }
+        } catch {
+          // ignorar JSON inválido
+        }
+      }
+    }
+
+    return pasosWorkflow.map((paso) => {
+      const eventosPaso = eventosPorPasoLocal.get(paso.idPaso) || [];
+      const ultimoEvento = eventosPaso[eventosPaso.length - 1];
+      const tipoUltimoEvento = ultimoEvento ? getTipoEvento(ultimoEvento) : null;
+      const isActual = selectedOrden?.idPasoActual === paso.idPaso;
+      const isRechazado = !isActual && tipoUltimoEvento === 'rechazo';
+      const isDevuelto = !isActual && tipoUltimoEvento === 'retorno';
+      // Un paso está completado si:
+      // 1. Tiene evento de autorización en su historial, O
+      // 2. Aparece como idPasoAnterior en algún snapshot (fue completado al moverse al siguiente paso)
+      const isCompletado = !isActual && (
+        tipoUltimoEvento === 'autorizacion' || pasosCompletados.has(paso.idPaso)
+      );
+      const esAnteriorADevuelto = isCompletado && currentPasoOrden !== null && paso.orden > currentPasoOrden;
+      const isOmitido =
+        !isActual &&
+        !isCompletado &&
+        !isRechazado &&
+        !isDevuelto &&
+        ((flujoFinalizado && paso.idPaso !== pasoActualConfig?.idPaso) ||
+          (currentPasoOrden !== null && paso.orden < currentPasoOrden));
+      return {
+        ...paso,
+        estadoVisual: isActual
+          ? 'actual'
+          : isRechazado
+            ? 'rechazado'
+            : isDevuelto  || esAnteriorADevuelto
+              ? 'devuelto'
+              : isCompletado
+                ? 'completado'
+                : isOmitido
+                  ? 'omitido'
+                  : ('pendiente' as
+                      | 'actual'
+                      | 'completado'
+                      | 'pendiente'
+                      | 'omitido'
+                      | 'rechazado'
+                      | 'devuelto'),
+      };
+    });
+  }, [pasosWorkflow, historial, selectedOrden?.idPasoActual, currentPasoOrden, pasosMap]);
+
+  const historialOrdenado = useMemo(
+    () =>
+      [...historial].sort(
+        (a, b) => new Date(a.fechaEvento).getTime() - new Date(b.fechaEvento).getTime()
+      ),
+    [historial]
+  );
+
+  const eventosPorPaso = useMemo(() => {
+    const map = new Map<number, HistorialWorkflowItemResponse[]>();
+    for (const item of historialOrdenado) {
+      const arr = map.get(item.idPaso) ?? [];
+      arr.push(item);
+      map.set(item.idPaso, arr);
+    }
+    return map;
+  }, [historialOrdenado]);
+
+  useEffect(() => {
+    if (!selectedOrden?.idPasoActual) return;
+    const container = pasosContainerRef.current;
+    if (!container) return;
+    const target = container.querySelector(
+      `[data-paso-id="${selectedOrden.idPasoActual}"]`
+    ) as HTMLElement | null;
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [selectedOrden?.idPasoActual, progresoPasos.length]);
+
+  const renderNombreAccion = (item: HistorialWorkflowItemResponse) => {
+    return item.nombreAccion || `Acción ${item.idAccion}`;
+  };
+
+  const getEventoIcon = (nombreAccion: string | null | undefined) => {
+    const n = (nombreAccion || '').toLowerCase();
+    if (n.includes('aprob') || n.includes('autoriza'))
+      return { Icon: CheckCircle2, color: 'text-emerald-500' };
+    if (n.includes('rechaz'))
+      return { Icon: XCircle, color: 'text-red-500' };
+    if (n.includes('devuelv') || n.includes('retorn'))
+      return { Icon: RotateCcw, color: 'text-amber-500' };
+    if (n.includes('envi') || n.includes('firma'))
+      return { Icon: Send, color: 'text-blue-500' };
+    return { Icon: ChevronRight, color: 'text-muted-foreground' };
+  };
+
+  const renderMovimientoEvento = (item: HistorialWorkflowItemResponse) => {
+    if (!item.datosSnapshot) return null;
+    try {
+      const snapshot = JSON.parse(item.datosSnapshot) as {
+        idPasoAnterior?: number | null;
+        idPasoNuevo?: number | null;
+      };
+      const from = snapshot.idPasoAnterior
+        ? pasosMap.get(snapshot.idPasoAnterior)?.nombrePaso
+        : null;
+      const to = snapshot.idPasoNuevo ? pasosMap.get(snapshot.idPasoNuevo)?.nombrePaso : null;
+      if (!from && !to) return null;
+      if (from && to && from !== to) return `De ${from} a ${to}`;
+      return to ? `Permanece en ${to}` : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const filtered = useMemo(() => {
+    return ordenes.filter((o) => {
+      const matchEstado = estadoFilter === 'all' || o.idEstado === Number(estadoFilter);
+      const matchCreador = creadorFilter === 'all' || o.idUsuarioCreador === creadorFilter;
+      const q = search.trim().toLowerCase();
+      const matchSearch =
+        q.length === 0 ||
+        o.folio.toLowerCase().includes(q);
+      return matchEstado && matchCreador && matchSearch;
+    });
+  }, [ordenes, estadoFilter, creadorFilter, search]);
+
+  const columns: ColumnDef<OrdenCompraResponse>[] = useMemo(() => [
+    {
+      accessorKey: 'folio',
+      header: 'Folio',
+      cell: ({ row }) => {
+        const razonSocial = row.original.idProveedor
+          ? allProveedoresMap.get(row.original.idProveedor)?.razonSocial
+          : null;
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium">{row.original.folio}</span>
+            <span className="text-xs text-muted-foreground">
+              {razonSocial ? `Proveedor ${razonSocial}` : `Proveedor #${row.original.idProveedor || 'N/A'}`}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'total',
+      header: 'Monto',
+      cell: ({ row }) => (
+        <span className="font-medium">
+          {row.original.total.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+        </span>
+      ),
+    },
+    {
+      id: 'descripcionPartidas',
+      header: 'Descripcion',
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground line-clamp-2 max-w-[200px]">
+          {row.original.partidas?.map(p => p.descripcion).filter(Boolean).join(', ') || '-'}
+        </span>
+      ),
+      size: 200,
+    },
+    {
+      accessorKey: 'fechaLimitePago',
+      header: 'Limite de pago',
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {fmtFecha(row.original.fechaLimitePago)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'fechaSolicitud',
+      header: 'Fecha solicitud',
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {fmtFecha(row.original.fechaSolicitud || row.original.fechaCreacion)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'idEstado',
+      header: 'Estado',
+      cell: ({ row }) => {
+        const info = getEstadoInfo(row.original.idEstado);
+        return (
+          <span
+            className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors"
+            style={{
+              borderColor: info.color,
+              color: info.color,
+              backgroundColor: info.color + '15',
+            }}
+          >
+            {info.nombre}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'solicitanteNombre',
+      header: 'Solicitante',
+      cell: ({ row }) => (
+        <span className="text-xs">
+          {row.original.solicitanteNombre ?? '-'}
+        </span>
+      ),
+      size: 150,
+    },
+    {
+      id: 'actions',
+      header: 'Acción',
+      cell: ({ row }) => (
+        <div className="flex gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={(e) => { e.stopPropagation(); setSelectedId(row.original.idOrden); setIsDetailDrawerOpen(true); }}
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Revisar
+          </Button>
+          {row.original.idEstado === 1 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={(e) => { e.stopPropagation(); navigate(`/ordenes/editar/${row.original.idOrden}`); }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Editar
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ], [workflowEstados, navigate, allProveedoresMap]);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <div className="space-y-4 xl:col-span-12">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Filtros de Bandeja</CardTitle>
+              <CardDescription>Filtra por estado, creador o búsqueda rápida</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div className="relative md:col-span-2">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Buscar por folio, proveedor o contacto"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <select
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                value={estadoFilter}
+                onChange={(e) => setEstadoFilter(e.target.value)}
+              >
+                {estados.map((e) => (
+                  <option key={e} value={e}>
+                    {e === 'all'
+                      ? 'Todos los estados'
+                      : getEstadoInfo(Number(e)).nombre}
+                  </option>
+                ))}
+              </select>
+              {puedeVerTodas && (
+                <select
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                  value={creadorFilter}
+                  onChange={(e) => setCreadorFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                >
+                  <option value="all">Todos los creadores</option>
+                  {creadores.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </CardContent>
+          </Card>
+
+          <DataTable
+            columns={columns}
+            data={filtered}
+            title="Órdenes pendientes para autorización"
+            subtitle={`Total: ${filtered.length}`}
+            pagination
+            pageSize={10}
+            globalFilter={false}
+            showRefreshButton
+            onRefresh={fetchOrdenes}
+            filterConfig={{
+              tableId: 'autorizaciones-oc',
+              searchableColumns: ['folio'],
+              defaultSearchColumns: ['folio'],
+            }}
+            onRowClick={(row) => { setSelectedId((row as OrdenCompraResponse).idOrden); setIsDetailDrawerOpen(true); }}
+            isRowSelected={(row) => (row as OrdenCompraResponse).idOrden === selectedId}
+            height={460}
+          />
+        </div>
+      </div>
+
+      <Modal
+        id="modal-detalle-oc"
+        open={isDetailDrawerOpen}
+        setOpen={(open) => {
+          setIsDetailDrawerOpen(open);
+          if (!open) setSelectedId(null);
+        }}
+        title={
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1">
+              <FileText className="h-5 w-5" />
+              <span>Detalle de orden de compra</span>
+            </div>
+            {selectedOrden && (
+              <span className="text-sm text-muted-foreground ml-3">
+                {selectedOrden.folio} — {selectedOrden.idProveedor && proveedoresMap.has(selectedOrden.idProveedor)
+                  ? proveedoresMap.get(selectedOrden.idProveedor)?.razonSocial
+                  : 'Sin proveedor'}
+              </span>
+            )}
+          </div>
+        }
+        size="full"
+      >
+        <div className="-mx-6 px-4 py-2">
+          {loadingDetail && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Cargando detalle...
+            </div>
+          )}
+
+          {!loadingDetail && !selectedOrden && (
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center text-muted-foreground">
+              <FileText className="h-10 w-10 opacity-30" />
+              <p className="text-sm font-medium">Aquí se mostrará el detalle de la orden</p>
+              <p className="text-xs opacity-70">Selecciona una orden de la lista para ver su información</p>
+            </div>
+          )}
+
+          {!loadingDetail && selectedOrden && (
+            <>
+              <Tabs defaultValue="detalle" className="flex h-full min-h-0 flex-col">
+                      <div className="bg-muted/20 rounded-lg border p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold">{selectedOrden.folio}</p>
+                          {selectedOrden.idProveedor && proveedoresMap.has(selectedOrden.idProveedor) ? (
+                            <div className="text-xs text-muted-foreground">
+                              <p className="truncate font-medium text-foreground">
+                                {proveedoresMap.get(selectedOrden.idProveedor)?.razonSocial}
+                              </p>
+                              <p className="text-[10px]">
+                                RFC: {proveedoresMap.get(selectedOrden.idProveedor)?.rfc || 'N/A'}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              {loadingProveedores ? 'Cargando proveedor...' : 'Sin proveedor asignado'}
+                            </p>
+                          )}
+                        </div>
+                        {(() => {
+                          const info = getEstadoInfo(selectedOrden.idEstado);
+                          return (
+                            <span
+                              className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold"
+                              style={{
+                                borderColor: info.color,
+                                color: info.color,
+                                backgroundColor: info.color + '15',
+                              }}
+                            >
+                              {info.nombre}
+                            </span>
+                          );
+                        })()}
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="rounded-md border bg-background px-2 py-1.5">
+                          <p className="text-[11px] text-muted-foreground">Subtotal</p>
+                          <p className="text-sm font-semibold">
+                            {formatCurrency(selectedOrden.subtotal)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-background px-2 py-1.5">
+                          <p className="text-[11px] text-muted-foreground">Total</p>
+                          <p className="text-sm font-semibold">
+                            {formatCurrency(selectedOrden.total)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── Acciones disponibles — siempre visibles arriba de todo ── */}
+                    {selectedOrden && acciones.filter(a => !a.enviaConcentrado).length > 0 && (
+                      <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/80 p-3 shadow-sm backdrop-blur-sm dark:border-blue-800 dark:bg-blue-950/20">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Acciones disponibles
+                            </span>
+                            <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-300">
+                              Paso actual
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {acciones
+                              .filter(a => !a.enviaConcentrado)
+                              .map((a) => (
+                              <Button
+                                key={a.idAccion}
+                                size="sm"
+                                className={(() => {
+                                  const styles: Record<string, string> = {
+                                    'APROBAR': 'bg-blue-600 hover:bg-blue-700 text-white',
+                                    'AUTORIZAR': 'bg-blue-600 hover:bg-blue-700 text-white',
+                                    'RECHAZAR': 'bg-red-600 hover:bg-red-700 text-white',
+                                    'DEVOLVER': 'bg-amber-500 hover:bg-amber-600 text-white',
+                                    'CANCELAR': 'bg-red-600 hover:bg-red-700 text-white',
+                                    'CERRAR': 'bg-emerald-600 hover:bg-emerald-700 text-white',
+                                    'ENVIAR_TESORERIA': 'bg-blue-600 hover:bg-blue-700 text-white',
+                                    'MARCAR_PAGADA': 'bg-blue-600 hover:bg-blue-700 text-white',
+                                    'NOTIFICACION': 'bg-amber-500 hover:bg-amber-600 text-white',
+                                    'ENVIAR': 'bg-blue-600 hover:bg-blue-700 text-white',
+                                  };
+                                  return styles[a.tipoAccionCodigo ?? ''] ?? 'bg-blue-600 hover:bg-blue-700 text-white';
+                                })()}
+                                onClick={(e) => { e.stopPropagation(); abrirModalFirma(a); }}
+                              >
+                                {a.tipoAccionNombre}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <TabsList className="bg-background sticky top-0 z-10 mt-3 grid h-10 w-full grid-cols-4 border p-1">
+                      <TabsTrigger
+                        value="detalle"
+                        className="border border-transparent text-xs font-semibold data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                      >
+                        Detalle completo
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="autorizar"
+                        className="border border-transparent text-xs font-semibold data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                      >
+                        Firmar
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="facturacion"
+                        className="border border-transparent text-xs font-semibold data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                        onClick={() => selectedOrden && fetchPartidasPendientes(selectedOrden.idOrden)}
+                      >
+                        Comprobantes
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="archivos"
+                        className="border border-transparent text-xs font-semibold data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                      >
+                        Archivos
+                        {archivosOrden.length > 0 && (
+                          <span className="bg-primary-foreground/20 ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none data-[state=active]:bg-white/20">
+                            {archivosOrden.length}
+                          </span>
+                        )}
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent
+                      value="detalle"
+                      className="mt-3 space-y-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1"
+                    >
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {selectedOrden.idProveedor && proveedoresMap.has(selectedOrden.idProveedor) ? (
+                          <div className="col-span-2 rounded-md border bg-background px-2 py-1.5">
+                            <div className="flex items-center justify-between">
+                              <p className="text-muted-foreground">Proveedor (Cabecero)</p>
+                              <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">
+                                Nivel orden
+                              </span>
+                            </div>
+                            <p className="font-medium">
+                              {proveedoresMap.get(selectedOrden.idProveedor)?.razonSocial}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              RFC: {proveedoresMap.get(selectedOrden.idProveedor)?.rfc || 'N/A'}
+                              {proveedoresMap.get(selectedOrden.idProveedor)?.regimenFiscalDescripcion && (
+                                <span className="ml-2">
+                                  • {proveedoresMap.get(selectedOrden.idProveedor)?.regimenFiscalDescripcion}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="col-span-2 rounded-md border border-dashed border-amber-300 bg-amber-50/30 px-2 py-1.5">
+                            <div className="flex items-center justify-between">
+                              <p className="text-muted-foreground">Proveedor</p>
+                              <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-600">
+                                Por partida
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">
+                              Cada partida tiene su propio proveedor asignado
+                            </p>
+                          </div>
+                        )}
+                        <div className="rounded-md border bg-background px-2 py-1.5">
+                          <p className="text-muted-foreground">Fiscales</p>
+                          <p className="font-medium">
+                            {selectedOrden.sinDatosFiscales ? 'Sin datos fiscales' : 'Con datos fiscales'}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-background px-2 py-1.5">
+                          <p className="text-muted-foreground">Solicitud</p>
+                          <p className="font-medium">
+                            {fmtFecha(selectedOrden.fechaSolicitud || selectedOrden.fechaCreacion)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-background px-2 py-1.5">
+                          <p className="text-muted-foreground">Límite pago</p>
+                          <p className="font-medium">
+                            {fmtFecha(selectedOrden.fechaLimitePago)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-background px-2 py-1.5">
+                          <p className="text-muted-foreground">Centro costo</p>
+                          <p className="font-medium">
+                            {selectedOrden.centroCostoNombre ||
+                              (selectedOrden.idCentroCosto
+                                ? `#${selectedOrden.idCentroCosto}`
+                                : 'Sin dato')}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-background px-2 py-1.5">
+                          <p className="text-muted-foreground">Cuenta contable</p>
+                          <p className="font-medium">
+                            {selectedOrden.cuentaContableNumero
+                              ? `${selectedOrden.cuentaContableNumero}${selectedOrden.cuentaContableDescripcion ? ` — ${selectedOrden.cuentaContableDescripcion}` : ''}`
+                              : 'Sin dato'}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-background px-2 py-1.5">
+                          <p className="text-muted-foreground">Comprobación pago</p>
+                          <p className="font-medium">
+                            {selectedOrden.requiereComprobacionPago ? 'Sí' : 'No'}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-background px-2 py-1.5">
+                          <p className="text-muted-foreground">Comprobación gasto</p>
+                          <p className="font-medium">
+                            {selectedOrden.requiereComprobacionGasto ? 'Sí' : 'No'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Formas de pago, cuentas bancarias y mensualidades */}
+                      {(selectedOrden.idsFormaPago?.length || selectedOrden.idsCuentasBancarias?.length || selectedOrden.numeroMensualidades) && (
+                        <div className="rounded-md border bg-background px-3 py-2 text-xs">
+                          <p className="mb-2 font-medium text-muted-foreground">Formas de pago</p>
+                          <div className="space-y-1.5">
+                            {selectedOrden.idsFormaPago?.map((idFp) => {
+                              const formaPago = formasPagoMap.get(idFp);
+                              return (
+                                <div key={idFp} className="flex items-center gap-2">
+                                  <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                                    Forma de pago
+                                  </span>
+                                  <span className="font-medium">
+                                    {formaPago?.nombre ?? `ID ${idFp}`}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {selectedOrden.idsCuentasBancarias?.map((idCb) => {
+                              let cuentaInfo: string | undefined;
+                              let cuentaActiva = true;
+                              for (const [, proveedor] of proveedoresMap) {
+                                const cuenta = proveedor.cuentasFormaPago?.find((c) => c.idCuen === idCb);
+                                if (cuenta) {
+                                  cuentaInfo = `${cuenta.bancoNombre ?? cuenta.formaPagoNombre ?? 'Banco'} — ${cuenta.numeroCuenta ?? ''}`;
+                                  cuentaActiva = cuenta.activo;
+                                  break;
+                                }
+                              }
+                              if (!cuentaInfo) {
+                                for (const [, proveedor] of allProveedoresMap) {
+                                  const cuenta = proveedor.cuentasFormaPago?.find((c) => c.idCuen === idCb);
+                                  if (cuenta) {
+                                    cuentaInfo = `${cuenta.bancoNombre ?? cuenta.formaPagoNombre ?? 'Banco'} — ${cuenta.numeroCuenta ?? ''}`;
+                                    cuentaActiva = cuenta.activo;
+                                    break;
+                                  }
+                                }
+                              }
+                              return (
+                                <div key={idCb} className="flex items-center gap-2">
+                                  <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                                    Cuenta bancaria
+                                  </span>
+                                  <span className="font-medium">
+                                    {cuentaInfo ?? `ID ${idCb}`}
+                                  </span>
+                                  {!cuentaActiva && (
+                                    <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+                                      inactiva
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {selectedOrden.numeroMensualidades && (
+                              <div className="flex items-center gap-2">
+                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                  Parcialidades
+                                </span>
+                                <span className="font-medium">
+                                  {selectedOrden.numeroMensualidades} parcialidad(es)
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedOrden.notaFormaPago && (
+                        <div className="rounded-md border bg-background px-3 py-2 text-xs">
+                          <p className="text-muted-foreground">Nota forma de pago</p>
+                          <p className="mt-1">{selectedOrden.notaFormaPago}</p>
+                        </div>
+                      )}
+
+                      {selectedOrden.notasGenerales && (
+                        <div className="rounded-md border bg-background px-3 py-2 text-xs">
+                          <p className="text-muted-foreground">Notas generales</p>
+                          <p className="mt-1">{selectedOrden.notasGenerales}</p>
+                        </div>
+                      )}
+
+                      <div className="rounded-lg border">
+                        <div className="flex items-center justify-between border-b px-3 py-2">
+                          <p className="text-sm font-medium">Partidas</p>
+                          <p className="text-xs text-muted-foreground">
+                            {selectedOrden.partidas.length} elemento(s)
+                          </p>
+                        </div>
+                        <div className="max-h-64 overflow-auto">
+                          <table className="w-full text-xs">
+                            <thead className="sticky top-0 bg-background">
+                              <tr className="border-b text-muted-foreground">
+                                <th className="w-8 px-2 py-2 text-center font-medium"></th>
+                                <th className="px-3 py-2 text-left font-medium">#</th>
+                                <th className="px-3 py-2 text-left font-medium">Descripción</th>
+                                <th className="px-3 py-2 text-right font-medium">Cant.</th>
+                                <th className="px-3 py-2 text-right font-medium">P. Unitario</th>
+                                <th className="px-3 py-2 text-right font-medium">IVA</th>
+                                <th className="px-3 py-2 text-right font-medium">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedOrden.partidas.length === 0 && (
+                                <tr>
+                                  <td
+                                    colSpan={7}
+                                    className="px-3 py-3 text-center text-muted-foreground"
+                                  >
+                                    Sin partidas registradas.
+                                  </td>
+                                </tr>
+                              )}
+                              {selectedOrden.partidas.map((partida) => {
+                                const isExpanded = expandedPartidaId === partida.idPartida;
+                                const subtotalPartida = partida.cantidad * partida.precioUnitario;
+                                const totalImpuestos =
+                                  subtotalPartida * (partida.porcentajeIva / 100);
+                                return (
+                                  <Fragment key={partida.idPartida}>
+                                    <tr
+                                      className="hover:bg-muted/30 cursor-pointer border-b"
+                                      onClick={() =>
+                                        setExpandedPartidaId((prev) =>
+                                          prev === partida.idPartida ? null : partida.idPartida
+                                        )
+                                      }
+                                    >
+                                      <td className="px-2 py-2 text-center">
+                                        {isExpanded ? (
+                                          <ChevronDown className="inline h-3.5 w-3.5 text-muted-foreground" />
+                                        ) : (
+                                          <ChevronRight className="inline h-3.5 w-3.5 text-muted-foreground" />
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2">{partida.numeroPartida}</td>
+                                       <td className="px-3 py-2">
+                                         <p className="font-medium">{partida.descripcion}</p>
+                                         <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                           <span>Deducible: {partida.deducible ? 'Sí' : 'No'}</span>
+                                            {partida.idProveedor && !selectedOrden.idProveedor && (
+                                              <span className="ml-2 rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">
+                                                Prov: {proveedoresMap.get(partida.idProveedor)?.razonSocial?.substring(0, 20) ?? 'N/A'}
+                                                {(proveedoresMap.get(partida.idProveedor)?.razonSocial?.length ?? 0) > 20 ? '...' : ''}
+                                              </span>
+                                            )}
+                                         </div>
+                                       </td>
+                                       <td className="px-3 py-2 text-right">{partida.cantidad}</td>
+                                      <td className="px-3 py-2 text-right">
+                                        {formatCurrency(partida.precioUnitario)}
+                                      </td>
+                                       <td className="px-3 py-2 text-right">
+                                         {partida.porcentajeIva}%
+                                       </td>
+                                      <td className="px-3 py-2 text-right font-semibold">
+                                        {formatCurrency(partida.total)}
+                                      </td>
+                                    </tr>
+                                    {isExpanded && (
+                                      <tr
+                                        key={`${partida.idPartida}-detail`}
+                                        className="bg-muted/20 border-b"
+                                      >
+                                        <td colSpan={7} className="px-3 py-2">
+                                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                            <div className="col-span-2 rounded border bg-background px-2 py-1.5">
+                                              <p className="text-muted-foreground">Descripción</p>
+                                              <p className="font-medium">{partida.descripcion}</p>
+                                            </div>
+                                            <div className="rounded border bg-background px-2 py-1.5">
+                                              <p className="text-muted-foreground">Cantidad</p>
+                                              <p className="font-medium">{partida.cantidad}</p>
+                                            </div>
+                                            <div className="rounded border bg-background px-2 py-1.5">
+                                              <p className="text-muted-foreground">Unidad de medida</p>
+                                              <p className="font-medium">
+                                                {partida.unidadMedidaNombre ?? `#${partida.idUnidadMedida}`}
+                                              </p>
+                                            </div>
+                                            <div className="rounded border bg-background px-2 py-1.5">
+                                              <p className="text-muted-foreground">Precio Unitario</p>
+                                              <p className="font-medium">{formatCurrency(partida.precioUnitario)}</p>
+                                            </div>
+                                            <div className="rounded border bg-background px-2 py-1.5">
+                                              <p className="text-muted-foreground">Descuento</p>
+                                              <p className="font-medium">{formatCurrency(partida.descuento)}</p>
+                                            </div>
+                                             <div className="rounded border bg-background px-2 py-1.5">
+                                               <p className="text-muted-foreground">
+                                                 Subtotal partida
+                                               </p>
+                                               <p className="font-medium">
+                                                 {formatCurrency(subtotalPartida)}
+                                               </p>
+                                             </div>
+                                             <div className="rounded border bg-background px-2 py-1.5">
+                                              <p className="text-muted-foreground">Impuesto</p>
+                                              <p className="font-medium">
+                                                 {partida.porcentajeIva}% ({formatCurrency(totalImpuestos)})
+                                              </p>
+                                            </div>
+                                            <div className="rounded border bg-background px-2 py-1.5">
+                                              <p className="text-muted-foreground">Retenciones</p>
+                                              <p className="font-medium">
+                                                {formatCurrency(partida.totalRetenciones)}
+                                              </p>
+                                            </div>
+                                              <div className="rounded border bg-background px-2 py-1.5">
+                                                <p className="text-muted-foreground">
+                                                  Otros impuestos
+                                                </p>
+                                                <p className="font-medium">
+                                                  {formatCurrency(partida.otrosImpuestos)}
+                                                </p>
+                                              </div>
+                                              <div className="rounded border bg-background px-2 py-1.5">
+                                                <p className="text-muted-foreground">
+                                                  Requiere Factura
+                                                </p>
+                                                <p className="font-medium">
+                                                  {partida.requiereFactura ? 'Sí' : 'No'}
+                                                </p>
+                                              </div>
+                                              {partida.idProveedor && proveedoresMap.has(partida.idProveedor) && (
+                                               <div className="col-span-2 rounded border border-blue-200 bg-blue-50/50 px-2 py-1.5">
+                                                 <div className="flex items-center justify-between">
+                                                   <p className="text-muted-foreground">Proveedor de partida</p>
+                                                   <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">
+                                                     Nivel partida
+                                                   </span>
+                                                 </div>
+                                                 <p className="font-medium">
+                                                   {proveedoresMap.get(partida.idProveedor)?.razonSocial}
+                                                 </p>
+                                                 <p className="text-[10px] text-muted-foreground">
+                                                   RFC: {proveedoresMap.get(partida.idProveedor)?.rfc || 'N/A'}
+                                                 </p>
+                                               </div>
+                                             )}
+                                           </div>
+                                         </td>
+                                       </tr>
+                                     )}
+                                  </Fragment>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent
+                      value="autorizar"
+                      className="mt-3 space-y-4 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">Flujo de pasos (inicio → fin)</p>
+                          {selectedOrden && progresoPasos.length > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1.5 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const handleBeforePrint = () => {
+                                  document.body.classList.add('print-flujo');
+                                };
+                                const handleAfterPrint = () => {
+                                  document.body.classList.remove('print-flujo');
+                                  window.removeEventListener('beforeprint', handleBeforePrint);
+                                  window.removeEventListener('afterprint', handleAfterPrint);
+                                };
+                                window.addEventListener('beforeprint', handleBeforePrint);
+                                window.addEventListener('afterprint', handleAfterPrint);
+                                window.print();
+                              }}
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                              Exportar flujo a PDF
+                            </Button>
+                          )}
+                          {selectedOrden && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1.5 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const handleBeforePrint = () => {
+                                  document.body.classList.add('print-orden');
+                                };
+                                const handleAfterPrint = () => {
+                                  document.body.classList.remove('print-orden');
+                                  window.removeEventListener('beforeprint', handleBeforePrint);
+                                  window.removeEventListener('afterprint', handleAfterPrint);
+                                };
+                                window.addEventListener('beforeprint', handleBeforePrint);
+                                window.addEventListener('afterprint', handleAfterPrint);
+                                window.print();
+                              }}
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              Exportar orden a PDF
+                            </Button>
+                          )}
+                        </div>
+                        {progresoPasos.length > 0 && (() => {
+                          return (
+                          <div
+                            ref={pasosContainerRef}
+                            className="relative max-h-[32rem] overflow-y-auto pr-1"
+                          >
+                            {/* Línea vertical fija — cubre toda la altura */}
+                            <div className="absolute left-[1.1rem] top-4 bottom-4 w-0.5 rounded-full bg-border/60" />
+
+                            <div className="space-y-2">
+                            {progresoPasos.map((paso, index) => {
+                              const isActual = paso.estadoVisual === 'actual';
+                              const isCompletado = paso.estadoVisual === 'completado';
+                              const isOmitido = paso.estadoVisual === 'omitido';
+                              const isRechazado = paso.estadoVisual === 'rechazado';
+                              const isDevuelto = paso.estadoVisual === 'devuelto';
+                              const isPendiente = !isActual && !isCompletado && !isOmitido && !isRechazado && !isDevuelto;
+                              const isExpanded = expandedPasoId === paso.idPaso;
+                              const isActualRechazada = isActual && selectedOrden?.idEstado === 8;
+                              const isActualCancelada = isActual && selectedOrden?.idEstado === 9;
+                              const eventosPaso = eventosPorPaso.get(paso.idPaso) || [];
+                              const ultimoEvento = eventosPaso[eventosPaso.length - 1];
+
+                              // Dot visual
+                              const dotBg = isCompletado
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : isActual
+                                  ? isActualRechazada
+                                    ? 'bg-red-500 border-red-500'
+                                    : isActualCancelada
+                                      ? 'bg-zinc-400 border-zinc-400'
+                                      : 'bg-blue-500 border-blue-500'
+                                  : isRechazado
+                                    ? 'bg-red-400 border-red-400'
+                                    : isDevuelto
+                                      ? 'bg-amber-400 border-amber-400'
+                                      : 'bg-background border-border';
+
+                              const DotIcon = isCompletado
+                                ? CheckCircle2
+                                : isRechazado || isActualRechazada
+                                  ? XCircle
+                                  : isDevuelto
+                                    ? AlertTriangle
+                                    : isPendiente || isOmitido
+                                      ? Clock
+                                      : null;
+
+                              // Card border/bg
+                              const cardClass = isActual
+                                ? isActualRechazada
+                                  ? 'border-l-red-400 bg-red-50/60 dark:bg-red-950/15'
+                                  : isActualCancelada
+                                    ? 'border-l-zinc-400 bg-zinc-50/60 dark:bg-zinc-900/30'
+                                    : 'border-l-blue-400 bg-blue-50/60 dark:bg-blue-950/15'
+                                : isCompletado
+                                  ? 'border-l-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/10'
+                                  : isRechazado
+                                    ? 'border-l-red-300 bg-red-50/40 dark:bg-red-950/10'
+                                    : isDevuelto
+                                      ? 'border-l-amber-300 bg-amber-50/40 dark:bg-amber-950/10'
+                                      : 'border-l-border/50 opacity-60';
+
+                              return (
+                                <div key={paso.idPaso} className="relative pl-10">
+                                  {/* Dot */}
+                                  <div className={`absolute left-3 top-3 z-10 flex h-4.5 w-4.5 items-center justify-center rounded-full border-2 ${dotBg}`}
+                                    style={{ width: '1.1rem', height: '1.1rem', left: '0.55rem' }}
+                                  >
+                                    {isActual && !isActualRechazada && !isActualCancelada ? (
+                                      <span className="relative flex h-full w-full">
+                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-50" />
+                                        <span className="relative inline-flex h-full w-full rounded-full bg-blue-500" />
+                                      </span>
+                                    ) : DotIcon ? (
+                                      <DotIcon className="h-2.5 w-2.5 text-white" strokeWidth={2.5} />
+                                    ) : null}
+                                  </div>
+
+                                  {/* Card */}
+                                  <div
+                                    role="button"
+                                    tabIndex={0}
+                                    data-paso-id={paso.idPaso}
+                                    onClick={() => setExpandedPasoId(prev => prev === paso.idPaso ? null : paso.idPaso)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedPasoId(prev => prev === paso.idPaso ? null : paso.idPaso); } }}
+                                    className={`w-full cursor-default rounded-lg border border-l-4 p-3 text-left transition-all hover:shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-primary/40 ${cardClass} ${isExpanded ? 'ring-1 ring-primary/30' : ''}`}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className="flex-shrink-0 inline-flex h-5 w-5 items-center justify-center rounded bg-muted text-[10px] font-bold text-muted-foreground">
+                                          {index + 1}
+                                        </span>
+                                        <span className="truncate text-sm font-medium">{paso.nombrePaso}</span>
+                                      </div>
+                                      <div className="flex flex-shrink-0 items-center gap-1.5">
+                                        {isActual ? (
+                                          <Badge variant={isActualRechazada ? 'destructive' : isActualCancelada ? 'outline' : 'secondary'} className="text-[10px] px-1.5 py-0">
+                                            {isActualRechazada ? 'Rechazada' : isActualCancelada ? 'Cancelada' : '● Actual'}
+                                          </Badge>
+                                        ) : isCompletado ? (
+                                          <Badge className="text-[10px] px-1.5 py-0 bg-emerald-500 hover:bg-emerald-500">✓ Completado</Badge>
+                                        ) : isRechazado ? (
+                                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Rechazado</Badge>
+                                        ) : isDevuelto ? (
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-600">Devuelto</Badge>
+                                        ) : isOmitido ? (
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 opacity-60">Omitido</Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">En espera</Badge>
+                                        )}
+                                        {isExpanded
+                                          ? <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                          : <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                                        }
+                                      </div>
+                                    </div>
+
+                                    {paso.descripcionAyuda && !isExpanded && (
+                                      <p className="mt-1 ml-7 text-[11px] text-muted-foreground truncate">{paso.descripcionAyuda}</p>
+                                    )}
+                                    {eventosPaso.length > 0 && !isExpanded && (
+                                      <p className="mt-1 ml-7 text-[11px] text-muted-foreground">
+                                        {eventosPaso.length} evento(s) · {renderNombreAccion(ultimoEvento)} · {fmtFecha(ultimoEvento.fechaEvento)}
+                                      </p>
+                                    )}
+
+                                    {isExpanded && (
+                                      <div className="mt-3 ml-1 space-y-3" onClick={e => e.stopPropagation()}>
+                                        {paso.descripcionAyuda && (
+                                          <p className="text-xs text-muted-foreground">{paso.descripcionAyuda}</p>
+                                        )}
+
+                                        {/* Historial de actividad */}
+                                        <div>
+                                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                            Historial de actividad
+                                          </p>
+                                          {eventosPaso.length === 0 ? (
+                                            <p className="rounded border bg-background/80 p-2 text-xs text-muted-foreground">Sin actividad registrada en este paso.</p>
+                                          ) : (
+                                            <div className="space-y-2">
+                                            {eventosPaso.map((item) => {
+                                              let transFrom: string | null = null;
+                                              let transTo: string | null = null;
+                                              if (item.datosSnapshot) {
+                                                try {
+                                                  const snap = JSON.parse(item.datosSnapshot) as {
+                                                    idPasoAnterior?: number | null;
+                                                    idPasoNuevo?: number | null;
+                                                  };
+                                                  transFrom = snap.idPasoAnterior
+                                                    ? (pasosMap.get(snap.idPasoAnterior)?.nombrePaso ?? null)
+                                                    : null;
+                                                  transTo = snap.idPasoNuevo
+                                                    ? (pasosMap.get(snap.idPasoNuevo)?.nombrePaso ?? null)
+                                                    : null;
+                                                } catch { /* ignore */ }
+                                              }
+                                              const showTrans = (transFrom || transTo) && transFrom !== transTo;
+
+                                              return (
+                                                <div key={item.idEvento} className="overflow-hidden rounded-lg border bg-background/80 text-xs">
+                                                  {/* Fila: acción + fecha */}
+                                                  <div className="flex items-center justify-between gap-2 border-b border-border/50 bg-muted/30 px-3 py-2">
+                                                    <span className="font-semibold truncate">
+                                                      {item.nombreAccion || `Acción ${item.idAccion}`}
+                                                    </span>
+                                                    <span className="text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0">
+                                                      {fmtFecha(item.fechaEvento)}
+                                                    </span>
+                                                  </div>
+                                                  {/* Cuerpo con etiquetas */}
+                                                  <div className="space-y-1 px-3 py-2">
+                                                    <div className="flex items-center gap-2">
+                                                      <span className="w-20 flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Realizado por</span>
+                                                      <div className="flex items-center gap-1 text-foreground/80">
+                                                        <UserRound className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                                                        <span>{item.nombreUsuario || `Usuario ${item.idUsuario}`}</span>
+                                                      </div>
+                                                    </div>
+                                                    {showTrans && (
+                                                      <div className="flex items-center gap-2">
+                                                        <span className="w-20 flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Movimiento</span>
+                                                        <div className="flex items-center gap-1 text-foreground/80">
+                                                          <MoveRight className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                                                          <span>
+                                                            {transFrom && (
+                                                              <><span className="text-foreground/60">{transFrom}</span><span className="mx-1 text-muted-foreground">→</span></>
+                                                            )}
+                                                            <span className="font-medium">{transTo}</span>
+                                                          </span>
+                                                        </div>
+                                                      </div>
+                                                    )}
+                                                    {item.comentario && (
+                                                      <div className="mt-2 rounded-md border border-border/60 bg-muted/60 px-3 py-2.5 shadow-sm">
+                                                        <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Comentario</p>
+                                                        <p className="text-[11px] leading-relaxed text-foreground/90 italic">{item.comentario}</p>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Acciones disponibles */}
+                                        {isActual && (
+                                          <div className="border-t border-border/50 pt-3">
+                                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                              Acciones disponibles
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                              {acciones.filter(a => !a.enviaConcentrado).length === 0 ? (
+                                                <p className="text-xs text-muted-foreground">
+                                                  No hay acciones disponibles para su usuario en este paso.
+                                                </p>
+                                              ) : (
+                                                acciones
+                                                  .filter(a => !a.enviaConcentrado)
+                                                  .map((a) => (
+                                                  <Button
+                                                   key={a.idAccion}
+                                                   size="sm"
+                                                   className={(() => {
+                                                     const styles: Record<string, string> = {
+                                                       'APROBAR': 'bg-blue-600 hover:bg-blue-700 text-white',
+                                                       'AUTORIZAR': 'bg-blue-600 hover:bg-blue-700 text-white',
+                                                       'RECHAZAR': 'bg-red-600 hover:bg-red-700 text-white',
+                                                       'DEVOLVER': 'bg-amber-500 hover:bg-amber-600 text-white',
+                                                       'CANCELAR': 'bg-red-600 hover:bg-red-700 text-white',
+                                                       'CERRAR': 'bg-emerald-600 hover:bg-emerald-700 text-white',
+                                                       'ENVIAR_TESORERIA': 'bg-blue-600 hover:bg-blue-700 text-white',
+                                                       'MARCAR_PAGADA': 'bg-blue-600 hover:bg-blue-700 text-white',
+                                                       'NOTIFICACION': 'bg-amber-500 hover:bg-amber-600 text-white',
+                                                       'ENVIAR': 'bg-blue-600 hover:bg-blue-700 text-white',
+                                                     };
+                                                     return styles[a.tipoAccionCodigo ?? ''] ?? 'bg-blue-600 hover:bg-blue-700 text-white';
+                                                   })()}
+                                                   onClick={(e) => { e.stopPropagation(); abrirModalFirma(a); }}
+                                                  >
+                                                    {a.tipoAccionNombre}
+                                                  </Button>
+                                                ))
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            </div>
+                          </div>
+                          );
+                        })()}
+                      </div>
+                    </TabsContent>
+
+                    {/* Tab: Comprobantes */}
+                    <TabsContent
+                      value="facturacion"
+                      className="mt-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1"
+                    >
+                      <div className="space-y-3">
+                        {/* Header del tab */}
+                        <div>
+                          <h3 className="text-sm font-semibold">Comprobantes de gasto y pago</h3>
+                          <p className="text-muted-foreground text-xs">
+                            Estado de comprobacion por partida
+                          </p>
+                        </div>
+
+                        {selectedOrden && (() => {
+                          const ordenCerrada = selectedOrden.idEstado === 10;
+                          const gastoCompleto = partidasPendientes.length > 0 && partidasPendientes.every(p => p.estadoFacturacion === 2);
+                          const pagoCompleto = partidasPendientesPago.length > 0 && partidasPendientesPago.every(p => p.importePendiente <= 0);
+                          return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Columna Gasto */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                                    <Receipt className="h-4 w-4" />
+                                    Comprobantes de Gasto
+                                  </h4>
+                                  <div className="flex gap-2">
+                                    <Button size="sm" variant="outline" disabled={gastoCompleto || ordenCerrada} onClick={() => setIsSubirComprobanteOpen(true)}>
+                                      Subir
+                                    </Button>
+                                    {!ordenCerrada && partidasPendientes.some(p => p.importeFacturado > 0) && (
+                                      <Button size="sm" variant="outline" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleBorrarTodosComprobantes('gasto')}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                                {partidasPendientes.length === 0 ? (
+                                  <div className="text-muted-foreground text-xs text-center py-4">Sin partidas de gasto</div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {partidasPendientes.map((partida) => {
+                                      const pctFacturado = partida.total > 0
+                                        ? Math.min(100, (partida.importeFacturado / partida.total) * 100)
+                                        : 0;
+                                      const estadoConfig = {
+                                        0: { label: 'Pendiente', className: 'bg-amber-100 text-amber-700 border-amber-200', barColor: 'bg-amber-400' },
+                                        1: { label: 'Parcial', className: 'bg-blue-100 text-blue-700 border-blue-200', barColor: 'bg-blue-400' },
+                                        2: { label: 'Completa', className: 'bg-green-100 text-green-700 border-green-200', barColor: 'bg-green-500' },
+                                      }[partida.estadoFacturacion] ?? { label: 'Desconocido', className: 'bg-muted text-muted-foreground border-muted', barColor: 'bg-muted' };
+
+                                      return (
+                                        <div key={`gasto-${partida.idPartida}`} className="bg-card rounded-lg border p-3 shadow-sm">
+                                          <div className="mb-2 flex items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-muted-foreground text-xs font-mono">#{partida.numeroPartida}</span>
+                                                <p className="truncate text-sm font-medium">{partida.descripcionPartida}</p>
+                                              </div>
+                                            </div>
+                                            <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${estadoConfig.className}`}>{estadoConfig.label}</span>
+                                          </div>
+                                          <div className="mb-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                            <div className={`h-full rounded-full transition-all ${estadoConfig.barColor}`} style={{ width: `${pctFacturado}%` }} />
+                                          </div>
+                                          <div className="text-muted-foreground flex items-center justify-between text-xs">
+                                            {partida.cantidadFacturada > 0 && (
+                                              <span>{partida.cantidadFacturada} / {partida.cantidad} unid.</span>
+                                            )}
+                                            <span>
+                                              {partida.importeFacturado.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })} /{' '}
+                                              {partida.total.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                                            </span>
+                                          </div>
+                                          {partida.importePendiente > 0 && (
+                                            <p className="mt-1 text-[10px] text-amber-600">
+                                              Pendiente: {partida.importePendiente.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                                            </p>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Columna Pago */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                                    <Banknote className="h-4 w-4" />
+                                    Comprobantes de Pago
+                                  </h4>
+                                  <div className="flex gap-2">
+                                    <Button size="sm" variant="outline" disabled={pagoCompleto || ordenCerrada} onClick={() => setIsSubirComprobantePagoOpen('pago')}>
+                                      Subir
+                                    </Button>
+                                    {!ordenCerrada && partidasPendientesPago.some(p => p.importeFacturado > 0) && (
+                                      <Button size="sm" variant="outline" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleBorrarTodosComprobantes('pago')}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                                {partidasPendientesPago.length === 0 ? (
+                                  <div className="text-muted-foreground text-xs text-center py-4">Sin partidas de pago</div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {partidasPendientesPago.map((partida) => {
+                                      const pctPagado = partida.total > 0
+                                        ? Math.min(100, (partida.importeFacturado / partida.total) * 100)
+                                        : 0;
+                                      const estadoPago = partida.importePendiente <= 0 ? 'Completa' : partida.importeFacturado > 0 ? 'Parcial' : 'Pendiente';
+                                      const colorPago = estadoPago === 'Completa' ? 'bg-green-100 text-green-700 border-green-200' : estadoPago === 'Parcial' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-amber-100 text-amber-700 border-amber-200';
+                                      const barPago = estadoPago === 'Completa' ? 'bg-green-500' : estadoPago === 'Parcial' ? 'bg-blue-400' : 'bg-amber-400';
+
+                                      return (
+                                        <div key={`pago-${partida.idPartida}`} className="bg-card rounded-lg border p-3 shadow-sm">
+                                          <div className="mb-2 flex items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-muted-foreground text-xs font-mono">#{partida.numeroPartida}</span>
+                                                <p className="truncate text-sm font-medium">{partida.descripcionPartida}</p>
+                                              </div>
+                                            </div>
+                                            <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${colorPago}`}>{estadoPago}</span>
+                                          </div>
+                                          <div className="mb-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                            <div className={`h-full rounded-full transition-all ${barPago}`} style={{ width: `${pctPagado}%` }} />
+                                          </div>
+                                          <div className="text-muted-foreground flex items-center justify-between text-xs">
+                                            <span>
+                                              {partida.importeFacturado.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })} /{' '}
+                                              {partida.total.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                                            </span>
+                                          </div>
+                                          {partida.importePendiente > 0 && (
+                                            <p className="mt-1 text-[10px] text-amber-600">
+                                              Pendiente: {partida.importePendiente.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                                            </p>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                    </TabsContent>
+
+                    {/* Tab: Archivos adjuntos */}
+                    <TabsContent
+                      value="archivos"
+                      className="mt-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1"
+                    >
+                      {(() => {
+                        // ── helpers locales ────────────────────────────────
+                        const parseMetaArchivo = (meta: unknown): {
+                          modulo?: string; origen?: string; tipo?: string; observaciones?: string;
+                          paso?: string; nombrePaso?: string; nombreAccion?: string;
+                          monto?: number; idComprobante?: number; subtipo?: string; archivo?: string;
+                        } => {
+                          if (!meta) return {};
+                          if (typeof meta === 'string') {
+                            try { return JSON.parse(meta); } catch { return { observaciones: meta }; }
+                          }
+                          if (typeof meta === 'object') return meta as ReturnType<typeof parseMetaArchivo>;
+                          return {};
+                        };
+
+                        const fmtSize = (b: number) =>
+                          b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
+
+                        const EXT_BADGE: Record<string, string> = {
+                          pdf:  'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+                          xlsx: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+                          xls:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+                          docx: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+                          doc:  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+                          png:  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+                          jpg:  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+                          jpeg: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+                          webp: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+                          gif:  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+                        };
+
+                        // ── lista plana de archivos (sin agrupar por paso) ─────
+                        return (
+                          <div className="space-y-2">
+                            {/* Encabezado */}
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Documentos adjuntos
+                                {archivosOrden.length > 0 && (
+                                  <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] normal-case font-medium">
+                                    {archivosOrden.length}
+                                  </span>
+                                )}
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setIsSubirAdjuntoOpen(!isSubirAdjuntoOpen)}
+                              >
+                                <Paperclip className="mr-1 h-3.5 w-3.5" />
+                                Subir
+                              </Button>
+                            </div>
+
+                            {/* Uploader desplegable */}
+                            {isSubirAdjuntoOpen && (
+                              <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                                <div className="space-y-1">
+                                  <Label className="text-xs text-muted-foreground">Observaciones</Label>
+                                  <Textarea
+                                    value={observacionesAdjunto}
+                                    onChange={e => setObservacionesAdjunto(e.target.value)}
+                                    placeholder="Ej: Contrato firmado, cotizacion..."
+                                    rows={2}
+                                    className="text-xs"
+                                  />
+                                </div>
+                                <FileUploader
+                                  inline open multiple cantidadMaxima={5}
+                                  entidadTipo="OrdenCompra" entidadId={selectedOrden.idOrden}
+                                  carpeta="ordenes-compra"
+                                  metadata={{
+                                    modulo: 'ordenes_compra', origen: 'workflow',
+                                    tipo: 'adjunto_libre',
+                                    paso: selectedOrden.idPasoActual ?? undefined,
+                                    nombrePaso: selectedOrden.idPasoActual != null
+                                      ? (pasosMap.get(selectedOrden.idPasoActual)?.nombrePaso ?? undefined)
+                                      : undefined,
+                                    observaciones: observacionesAdjunto || undefined,
+                                  }}
+                                  tiposPermitidos={['.pdf', '.xml', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx']}
+                                  descripcion="Arrastra o selecciona documentos de soporte"
+                                  onUploadComplete={(nuevos) => {
+                                    if (nuevos.length > 0) fetchArchivosOrden(selectedOrden.idOrden);
+                                    setIsSubirAdjuntoOpen(false);
+                                    setObservacionesAdjunto('');
+                                  }}
+                                  onClose={() => { setIsSubirAdjuntoOpen(false); setObservacionesAdjunto(''); }}
+                                />
+                              </div>
+                            )}
+
+                            {/* Loading */}
+                            {loadingArchivos ? (
+                              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                <span className="text-sm">Cargando archivos...</span>
+                              </div>
+                            ) : archivosOrden.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 text-muted-foreground">
+                                <Paperclip className="mb-2 h-8 w-8 opacity-30" />
+                                <p className="text-sm">Sin archivos adjuntos</p>
+                                <p className="mt-1 text-xs opacity-70">
+                                  Los documentos subidos en el flujo aparecerán aquí
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                {archivosOrden.map((archivo) => {
+                                  const meta = parseMetaArchivo(archivo.metadata);
+                                  const ext = archivo.extension?.toLowerCase().replace('.', '') ?? '';
+                                  const esComprobante = meta.tipo === 'comprobante_pago' || meta.tipo === 'comprobante_gasto';
+                                  let tipoLabel: string | undefined;
+                                  if (esComprobante) {
+                                    const subLabel = meta.subtipo ? meta.subtipo.toUpperCase() : '';
+                                    const archLabel = meta.archivo === 'xml' ? 'XML' : meta.archivo === 'pdf' ? 'PDF' : '';
+                                    tipoLabel = [subLabel, archLabel].filter(Boolean).join(' · ') || (meta.tipo === 'comprobante_pago' ? 'Pago' : 'Gasto');
+                                  } else {
+                                    tipoLabel = meta.tipo ?? meta.observaciones;
+                                  }
+
+                                  return (
+                                    <div
+                                      key={archivo.id}
+                                      className="group flex items-start gap-2.5 rounded-lg border bg-background px-2.5 py-2 text-xs transition-colors hover:border-primary/40 hover:bg-muted/30"
+                                    >
+                                      <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${EXT_BADGE[ext] ?? 'bg-muted text-muted-foreground'}`}>
+                                        {ext || '?'}
+                                      </span>
+
+                                      <div className="min-w-0 flex-1 space-y-0.5">
+                                        <p className="truncate font-medium leading-tight" title={archivo.nombreOriginal}>
+                                          {archivo.nombreOriginal}
+                                        </p>
+                                        {meta.observaciones && (
+                                          <p className="text-xs text-blue-800 dark:text-blue-200 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded px-2 py-1 leading-tight">
+                                            {meta.observaciones}
+                                          </p>
+                                        )}
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          {tipoLabel && (
+                                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'`}>
+                                              {tipoLabel}
+                                            </span>
+                                          )}
+                                          {esComprobante && meta.monto != null && (
+                                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                              {(meta.monto as number).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                                            </span>
+                                          )}
+                                          {archivo.usuarioSubioNombre && (
+                                            <span className="text-[10px] text-muted-foreground/60">
+                                              {archivo.usuarioSubioNombre}
+                                            </span>
+                                          )}
+                                          <span className="text-[10px] text-muted-foreground/40">
+                                            {fmtFecha(archivo.fechaCreacion)}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex shrink-0 items-center gap-0.5">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" title="Ver documento"
+                                          onClick={() => setViewerArchivoId(archivo.id)}>
+                                          <Eye className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <a href={archivoService.getDownloadUrl(archivo.id)} target="_blank" rel="noopener noreferrer" title="Descargar">
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
+                                            <Download className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </a>
+                                        {!esComprobante && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                            title="Borrar archivo"
+                                            onClick={() => handleEliminarArchivo(archivo.id)}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </TabsContent>
+                  </Tabs>
+                </>
+              )}
+            </div>
+      </Modal>
+
+      <Modal
+        id="modal-firmar-oc"
+        open={isFirmarModalOpen}
+        setOpen={(open) => {
+          setIsFirmarModalOpen(open);
+          if (!open) cerrarModalFirma();
+        }}
+        title={accionSeleccionada ? `${accionSeleccionada.tipoAccionNombre} orden` : 'Procesar firma'}
+        size="lg"
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button variant="outline" onClick={cerrarModalFirma} disabled={isSubmittingFirma}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={enviarFirma}
+              disabled={isSubmittingFirma}
+              variant={esRechazo ? 'destructive' : 'default'}
+            >
+              {isSubmittingFirma && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {textoBotonConfirmar}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className={`rounded-md border p-3 ${bgAccion}`}>
+            <p className={`text-sm font-semibold ${colorAccion}`}>{selectedOrden?.folio}</p>
+            <p className="text-xs text-muted-foreground">
+              Estado actual: {selectedOrden ? getEstadoInfo(selectedOrden.idEstado).nombre : '-'}{' '}
+              {accionSeleccionada ? `• Acción: ${accionSeleccionada.tipoAccionNombre}` : ''}
+            </p>
+            {(esRechazo || esRetorno) && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Esta acción impacta el flujo y requiere justificación en el comentario.
+              </p>
+            )}
+          </div>
+
+          {/* Dynamic campos based on action handlers */}
+          {camposParaAccion.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="flex items-center gap-2 text-sm font-semibold">
+                Informacion requerida
+                {loadingCatalogos && (
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                )}
+              </h4>
+
+              {/* Mensajes de validacion de todos los handlers que tengan uno */}
+              {camposParaAccion.some(c => c.validacionMensaje) && (
+                <div className="space-y-1.5">
+                  {camposParaAccion.filter(c => c.validacionMensaje).map(({ campo, validacionExito, validacionMensaje }) => (
+                    <div
+                      key={campo.nombreTecnico}
+                      className={`rounded-md border px-3 py-2 text-sm ${
+                        validacionExito === false
+                          ? 'border-red-300 bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-400'
+                          : 'border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                          <p className="font-semibold">{campo.etiquetaUsuario}</p>
+                          <p className="mt-0.5 text-xs opacity-90">{validacionMensaje}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Inputs y otros controles */}
+              {camposParaAccion
+                .filter(c => c.campo.tipoControl !== 'Alerta' && c.campo.tipoControl !== 'Validacion')
+                .map(({ campo, requerido, inputKey, validacionExito, validacionMensaje }) => {
+                const fieldId = `campo-${inputKey}`;
+                const value = camposValues[inputKey];
+
+                if (campo.tipoControl === 'Booleano' || campo.tipoControl === 'Checkbox') {
+                  return (
+                    <div key={inputKey} className="flex items-center gap-2">
+                      <Checkbox
+                        id={fieldId}
+                        checked={Boolean(value)}
+                        onCheckedChange={(v) =>
+                          setCamposValues((prev) => ({ ...prev, [inputKey]: Boolean(v) }))
+                        }
+                      />
+                      <Label htmlFor={fieldId}>
+                        {campo.etiquetaUsuario}
+                        {requerido && <span className="ml-1 text-red-500">*</span>}
+                      </Label>
+                    </div>
+                  );
+                }
+
+                if (campo.tipoControl === 'Selector' && campo.sourceCatalog) {
+                  const options = catalogos[campo.sourceCatalog] || [];
+                  const currentValue = String(value ?? '');
+                  const selectedLabel = options.find((o) => o.value === currentValue)?.label;
+                  return (
+                    <div key={inputKey} className="space-y-1.5">
+                      <Label htmlFor={fieldId}>
+                        {campo.etiquetaUsuario}
+                        {requerido && <span className="ml-1 text-red-500">*</span>}
+                      </Label>
+                      {options.length > 0 ? (
+                        <Combobox
+                          data={options.map((o) => ({ value: o.label, label: o.label }))}
+                          type={campo.etiquetaUsuario.toLowerCase()}
+                          value={selectedLabel || ''}
+                          onValueChange={(label) => {
+                            const opt = options.find((o) => o.label === label);
+                            if (opt) {
+                              setCamposValues((prev) => ({ ...prev, [inputKey]: opt.value }));
+                            }
+                          }}
+                        >
+                          <ComboboxTrigger className="w-full" />
+                          <ComboboxContent
+                            filter={(value, search) => {
+                              if (!search) return 1;
+                              const v = value.toLowerCase();
+                              const s = search.toLowerCase();
+                              return v.includes(s) ? 1 : 0;
+                            }}
+                          >
+                            <ComboboxInput
+                              placeholder={`Buscar ${campo.etiquetaUsuario.toLowerCase()}...`}
+                            />
+                            <ComboboxEmpty>
+                              No se encontró {campo.etiquetaUsuario.toLowerCase()}
+                            </ComboboxEmpty>
+                            <ComboboxList>
+                              <ComboboxGroup>
+                                {options.map((opt) => (
+                                  <ComboboxItem key={opt.value} value={opt.label}>
+                                    {opt.label}
+                                  </ComboboxItem>
+                                ))}
+                              </ComboboxGroup>
+                            </ComboboxList>
+                          </ComboboxContent>
+                        </Combobox>
+                      ) : (
+                        <Input
+                          id={fieldId}
+                          value={String(value ?? '')}
+                          onChange={(e) =>
+                            setCamposValues((prev) => ({ ...prev, [inputKey]: e.target.value }))
+                          }
+                          placeholder={
+                            loadingCatalogos ? 'Cargando opciones...' : campo.etiquetaUsuario
+                          }
+                          disabled={loadingCatalogos}
+                        />
+                      )}
+                    </div>
+                  );
+                }
+
+                if (campo.tipoControl === 'Numero') {
+                  return (
+                    <div key={inputKey} className="space-y-1.5">
+                      <Label htmlFor={fieldId}>
+                        {campo.etiquetaUsuario}
+                        {requerido && <span className="ml-1 text-red-500">*</span>}
+                      </Label>
+                      <Input
+                        id={fieldId}
+                        type="number"
+                        value={String(value ?? '')}
+                        onChange={(e) =>
+                          setCamposValues((prev) => ({
+                            ...prev,
+                            [inputKey]: e.target.value === '' ? '' : Number(e.target.value.replace(',', '.')),
+                          }))
+                        }
+                        placeholder={`Ingresa ${campo.etiquetaUsuario.toLowerCase()}`}
+                      />
+                    </div>
+                  );
+                }
+
+                if (campo.tipoControl === 'Fecha') {
+                  return (
+                    <div key={inputKey} className="space-y-1.5">
+                      <Label htmlFor={fieldId}>
+                        {campo.etiquetaUsuario}
+                        {requerido && <span className="ml-1 text-red-500">*</span>}
+                      </Label>
+                      <Input
+                        id={fieldId}
+                        type="date"
+                        value={String(value ?? '')}
+                        onChange={(e) =>
+                          setCamposValues((prev) => ({ ...prev, [inputKey]: e.target.value }))
+                        }
+                      />
+                    </div>
+                  );
+                }
+
+                // Archivo: comprobantes se suben desde el tab Comprobantes
+                if (campo.tipoControl === 'Archivo') {
+                  const comprobantes = comprobantesWorkflow[inputKey] ?? [];
+                  return (
+                    <div key={inputKey} className="space-y-1.5">
+                      <Label>
+                        {campo.etiquetaUsuario}
+                        {requerido && <span className="ml-1 text-red-500">*</span>}
+                      </Label>
+                      {comprobantes.length > 0 ? (
+                        <p className="text-xs text-emerald-600 flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {comprobantes.length} comprobante(s) cargado(s)
+                        </p>
+                      ) : (
+                        <p className="text-xs text-amber-600">
+                          Sube el comprobante desde la pestaña Comprobantes.
+                        </p>
+                      )}
+                    </div>
+                  );
+                }
+
+                // Default: Texto
+                return (
+                  <div key={inputKey} className="space-y-1.5">
+                    <Label htmlFor={fieldId}>
+                      {campo.etiquetaUsuario}
+                      {requerido && <span className="ml-1 text-red-500">*</span>}
+                    </Label>
+                    <Input
+                      id={fieldId}
+                      value={String(value ?? '')}
+                      onChange={(e) =>
+                        setCamposValues((prev) => ({ ...prev, [inputKey]: e.target.value }))
+                      }
+                      placeholder={`Ingresa ${campo.etiquetaUsuario.toLowerCase()}`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="comentario-firma">
+                Comentario
+                {(esRechazo || esRetorno || accionSeleccionada?.requiereComentario) && (
+                  <span className="ml-1 text-red-500">*</span>
+                )}
+              </Label>
+              {!esRechazo && !esRetorno && !accionSeleccionada?.requiereComentario && (
+                <span className="text-xs text-muted-foreground">Opcional</span>
+              )}
+            </div>
+            <Textarea
+              id="comentario-firma"
+              value={comentarioFirma}
+              onChange={(e) => setComentarioFirma(e.target.value)}
+              placeholder={
+                esRechazo
+                  ? 'Explica el motivo del rechazo'
+                  : esRetorno
+                    ? 'Explica el motivo de la devolución'
+                    : 'Escribe un comentario'
+              }
+              rows={4}
+            />
+            {(esRechazo || esRetorno) && (
+              <p className="text-xs text-red-600">
+                El comentario es obligatorio para esta acción.
+              </p>
+            )}
+          </div>
+
+          {/* Adjunto libre — visible when action allows free attachments */}
+          {accionSeleccionada?.permiteAdjunto && selectedOrden && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>
+                  Documentos adjuntos
+                  {accionSeleccionada.requiereAdjunto && (
+                    <span className="ml-1 text-red-500">*</span>
+                  )}
+                  {adjuntosLibres.length > 0 && (
+                    <span className="ml-1.5 font-normal text-muted-foreground">
+                      ({adjuntosLibres.length}/5)
+                    </span>
+                  )}
+                </Label>
+                {!accionSeleccionada?.requiereAdjunto && (
+                  <span className="text-xs text-muted-foreground">Opcional</span>
+                )}
+              </div>
+
+              {/* List of already-uploaded free adjuntos */}
+              {adjuntosLibres.length > 0 && (
+                <div className="space-y-1.5">
+                  {adjuntosLibres.map((archivo) => (
+                    <div
+                      key={archivo.id}
+                      className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm dark:border-green-800 dark:bg-green-950/20"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
+                      <span className="flex-1 truncate text-green-800 dark:text-green-300">
+                        {archivo.nombreOriginal}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Uploader — shown while under limit */}
+              {adjuntosLibres.length < 5 && (
+                <FileUploader
+                  inline
+                  open={true}
+                  multiple
+                  cantidadMaxima={5 - adjuntosLibres.length}
+                  entidadTipo="OrdenCompra"
+                  entidadId={selectedOrden.idOrden}
+                  carpeta="ordenes-compra"
+                  metadata={{
+                    modulo: 'ordenes_compra',
+                    origen: 'workflow',
+                    tipo: 'adjunto_libre',
+                    paso: selectedOrden.idPasoActual ?? undefined,
+                    nombrePaso: currentPaso?.nombrePaso ?? undefined,
+                    nombreAccion: accionSeleccionada?.tipoAccionNombre ?? undefined,
+                    observaciones: comentarioFirma || undefined,
+                  }}
+                  tiposPermitidos={['.pdf', '.xml', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx']}
+                  descripcion="Arrastra o selecciona documentos de soporte"
+                  onUploadComplete={(nuevos) => {
+                    if (nuevos.length > 0) {
+                      setAdjuntosLibres((prev) => [...prev, ...nuevos].slice(0, 5));
+                    }
+                  }}
+                  onClose={() => {}}
+                />
+              )}
+
+              {adjuntosLibres.length >= 5 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Límite de 5 documentos alcanzado.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* ── Modal CFDI gasto — fuera del modal de firma para evitar Dialog anidado ─────── */}
+      {selectedOrden && (
+        <SubirComprobanteModal
+          open={isSubirComprobanteOpen}
+          onClose={() => setIsSubirComprobanteOpen(false)}
+          idEmpresa={selectedOrden.idEmpresa}
+          idOrden={selectedOrden.idOrden}
+          idPasoWorkflow={selectedOrden.idPasoActual ?? undefined}
+          nombrePaso={
+            selectedOrden.idPasoActual != null
+              ? (pasosMap.get(selectedOrden.idPasoActual)?.nombrePaso ?? null)
+              : null
+          }
+          nombreAccion={accionSeleccionada?.tipoAccionNombre ?? null}
+          partidasPendientes={partidasPendientes}
+          onComprobanteSubido={(c) => {
+            setComprobantesWorkflow((prev) => ({
+              ...prev,
+              comprobante_gasto: [...(prev['comprobante_gasto'] ?? []), c],
+            }));
+            fetchPartidasPendientes(selectedOrden.idOrden);
+          }}
+        />
+      )}
+
+      {/* ── Modal comprobante pago — fuera del modal de firma para evitar Dialog anidado ─ */}
+      {selectedOrden && isSubirComprobantePagoOpen && (
+        <SubirComprobantePagoModal
+          open={!!isSubirComprobantePagoOpen}
+          onClose={() => setIsSubirComprobantePagoOpen(null)}
+          idEmpresa={selectedOrden.idEmpresa}
+          idOrden={selectedOrden.idOrden}
+          idPasoWorkflow={selectedOrden.idPasoActual ?? null}
+          nombrePaso={
+            selectedOrden.idPasoActual != null
+              ? (pasosMap.get(selectedOrden.idPasoActual)?.nombrePaso ?? null)
+              : null
+          }
+          nombreAccion={accionSeleccionada?.tipoAccionNombre ?? null}
+          totalOrden={selectedOrden.total}
+          folioOrden={selectedOrden.folio}
+          totalPagado={(comprobantesWorkflow[isSubirComprobantePagoOpen] ?? []).reduce((sum, c) => sum + c.total, 0)}
+          partidasPendientes={partidasPendientesPago}
+          onComprobanteSubido={(c) => {
+            const key = isSubirComprobantePagoOpen;
+            setComprobantesWorkflow((prev) => ({
+              ...prev,
+              [key]: [...(prev[key] ?? []), c],
+            }));
+            fetchPartidasPendientes(selectedOrden.idOrden);
+            fetchArchivosOrden(selectedOrden.idOrden);
+          }}
+        />
+      )}
+
+      {/* FileViewer para previsualizar archivos adjuntos */}
+      {viewerArchivoId !== null && (
+        <FileViewer
+          archivoId={viewerArchivoId}
+          open={viewerArchivoId !== null}
+          onClose={() => setViewerArchivoId(null)}
+        />
+      )}
+
+      {/* ── PDF Print Document — Flujo ── */}
+      {selectedOrden && progresoPasos.length > 0 && createPortal(
+        <FlujoOrdenPDF
+          orden={selectedOrden}
+          progresoPasos={progresoPasos as ProgresoPasoPDF[]}
+          eventosPorPaso={eventosPorPaso as Map<number, HistorialPDFItem[]>}
+          pasosMap={pasosMap as Map<number, PasoPDFConfig>}
+        />,
+        document.body
+      )}
+
+      {/* ── PDF Print Document — Orden de Compra ── */}
+      {selectedOrden && createPortal(
+        <OrdenCompraPDF
+          orden={selectedOrden}
+          historial={historial}
+          pasosWorkflow={pasosWorkflow}
+          proveedoresMap={proveedoresMap}
+          firmasMap={firmasMap}
+          formasPagoMap={formasPagoMap}
+        />,
+        document.body
+      )}
+
+    </div>
+  );
+}
