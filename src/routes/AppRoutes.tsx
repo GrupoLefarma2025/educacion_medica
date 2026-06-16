@@ -6,6 +6,7 @@ import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import Login from '@/pages/auth/Login';
 import SelectEmpresaSucursal from '@/pages/auth/SelectEmpresaSucursal';
 import BlockedPage from '@/pages/auth/BlockedPage';
+import HandoffLogin from '@/pages/auth/HandoffLogin';
 import Dashboard from '@/pages/Dashboard';
 import RolesList from '@/pages/admin/Roles/RolesList';
 import PermisosList from '@/pages/admin/Permisos/PermisosList';
@@ -61,6 +62,7 @@ export const AppRoutes = () => {
         </Route>
       </Route>
       <Route path="/bloqueado" element={<BlockedPage />} />
+      <Route path="/handoff-login" element={<HandoffLogin />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

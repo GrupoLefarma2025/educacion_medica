@@ -44,6 +44,21 @@ export const authService = {
     return response.data.data;
   },
 
+  // Single-use handoff token (SSO from another front). Stores session identically
+  // to loginStepTwo so authStore.initialize() picks it up.
+  exchangeHandoff: async (token: string): Promise<void> => {
+    const response = await API.post<ApiResponse<LoginStepTwoResponse>>(
+      '/auth/exchange',
+      { token }
+    );
+
+    const { accessToken, refreshToken, user } = response.data.data;
+
+    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  },
+
   refreshToken: async (refreshToken: string): Promise<LoginStepTwoResponse> => {
     const response = await API.post<ApiResponse<LoginStepTwoResponse>>(
       '/auth/refresh',
