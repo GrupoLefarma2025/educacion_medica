@@ -48,7 +48,6 @@ import { useAuthStore } from '@/store/authStore';
 import favicon from '@/assets/favicon.ico';
 import type { PermissionCheckOptions } from '@/utils/permissions';
 import { checkPermission } from '@/utils/permissions';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface MenuItemBase {
   title: string;
@@ -111,20 +110,13 @@ const menuItems: SidebarMenuItemConfig[] = [
       { title: 'Empresas', icon: Building, path: '/catalogos/empresas', permission: { require: 'empresas.ver_listado' } },
       { title: 'Sucursales', icon: Store, path: '/catalogos/sucursales', permission: { require: 'sucursales.ver_listado' } },
       { title: 'Áreas', icon: Database, path: '/catalogos/area', permission: { require: 'areas.ver_listado' } },
-      { title: 'Tipos de Gasto', icon: Wallet, path: '/catalogos/tipos-gasto', permission: { require: 'tipos-gasto.ver_listado' } },
-      { title: 'Medidas', icon: Ruler, path: '/catalogos/medidas', permission: { require: 'medidas.ver_listado' } },
-      { title: 'Formas de Pago', icon: CreditCard, path: '/catalogos/formas-pago', permission: { require: 'formas-pago.ver_listado' } },
-      { title: 'Tipos de Impuesto', icon: Receipt, path: '/catalogos/tipos-impuesto', permission: { require: 'tipos-impuesto.ver_listado' } },
-      { title: 'Centros de Costo', icon: MapPin, path: '/catalogos/centros-costo', permission: { require: 'centros-costo.ver_listado' } },
-      { title: 'Cuentas Contables', icon: FileText, path: '/catalogos/cuentas-contables', permission: { require: 'cuentas-contables.ver_listado' } },
-      { title: 'Estatus de Orden', icon: List, path: '/catalogos/estatus-orden', permission: { require: 'estatus-orden.ver_listado' } },
-      { title: 'Regímenes Fiscales', icon: UserCircle, path: '/catalogos/regimenes-fiscales', permission: { require: 'regimenes-fiscales.ver_listado' } },
+      
     ],
   },
 ];
 
 export function AppSidebar() {
-  const { user, logout, hasFirma } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
 
@@ -262,24 +254,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="sm" asChild tooltip="Configuración">
               <NavLink to="/configuracion">
-                <span className="relative">
-                  <User className="h-4 w-4" />
-                  {hasFirma === false && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="absolute -right-1 -top-1 flex h-2.5 w-2.5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-                            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="text-xs">
-                          <p>Falta subir firma digital</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </span>
+                <User className="h-4 w-4" />
                 <span>{user?.nombre || 'Usuario'}</span>
               </NavLink>
             </SidebarMenuButton>

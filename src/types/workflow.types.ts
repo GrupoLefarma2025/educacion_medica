@@ -54,7 +54,6 @@ export interface WorkflowAccion {
   enviaConcentrado?: boolean;
   activo: boolean;
   handlers?: WorkflowAccionHandler[];
-  notificaciones?: WorkflowNotificacion[]; // Notificaciones que dispara esta acción
 }
 
 export interface WorkflowAccionHandler {
@@ -102,68 +101,12 @@ export interface WorkflowParticipante {
   activo: boolean;
 }
 
-// ─── WorkflowNotificacion ─────────────────────────────────────────────────────
-
-export interface WorkflowNotificacionCanal {
-  idNotificacionCanal?: number;
-  codigoCanal: string;
-  asuntoTemplate?: string;
-  cuerpoTemplate: string;
-  listadoRowHtml?: string;
-  activo: boolean;
-}
-
-export interface WorkflowNotificacion {
-  idNotificacion: number;
-  idAccion: number;
-  idPasoDestino?: number;
-  idTipoNotificacion?: number;
-  enviarEmail: boolean;
-  enviarWhatsapp: boolean;
-  enviarTelegram: boolean;
-  avisarAlCreador: boolean;
-  avisarAlSiguiente: boolean;
-  avisarAlAnterior: boolean;
-  avisarAAutorizadoresPrevios: boolean;
-  incluirPartidas: boolean;
-  activo: boolean;
-  canales?: WorkflowNotificacionCanal[];
-}
-
-// ─── WorkflowBitacora ─────────────────────────────────────────────────────────
-
 export interface WorkflowEstado {
   idEstado: number;
   codigo?: string;
   nombre?: string;
   colorHex?: string;
   activo: boolean;
-}
-
-export interface WorkflowTipoNotificacion {
-  idTipo: number;
-  idTipoNotificacion?: number;
-  codigoTipo?: string;
-  nombre?: string;
-  icono?: string;
-  activo?: boolean;
-}
-
-export interface CanalTemplate {
-  idTemplate?: number;
-  codigoCanal: string;
-  nombre: string;
-  layoutHtml: string;
-  activo: boolean;
-}
-
-export interface WorkflowRecordatorio {
-  idRecordatorio?: number;
-  idTipoNotificacion: number;
-  diasAntes?: number;
-  horaEnvio?: string;
-  activo: boolean;
-  canales?: WorkflowNotificacionCanal[];
 }
 
 export interface WorkflowBitacora {
@@ -184,7 +127,6 @@ export interface WorkflowStats {
   totalPasos: number;
   totalAcciones: number;
   totalCondiciones: number;
-  totalNotificaciones: number;
   totalMappings: number;
 }
 

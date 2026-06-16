@@ -22,7 +22,7 @@ const tabs: TabItem[] = [
     value: 'perfil',
     label: 'Mi Perfil',
     icon: User,
-    description: 'Actualiza tu información personal y configura tus preferencias de notificación',
+    description: 'Actualiza tu información personal',
     permission: [],
   },
   {

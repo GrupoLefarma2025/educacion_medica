@@ -9,7 +9,6 @@ import {
   Mail,
   Building2,
   Briefcase,
-  Bell,
   Smartphone,
   Shield,
   Key,
@@ -196,16 +195,6 @@ const usuarioSchema = z.object({
     telefonoOficina: z.string().optional().nullable(),
     extension: z.string().optional().nullable(),
     celular: z.string().optional().nullable(),
-    telegramChat: z.string().optional().nullable(),
-    notificarEmail: z.boolean(),
-    notificarApp: z.boolean(),
-    notificarWhatsapp: z.boolean(),
-    notificarSms: z.boolean(),
-    notificarTelegram: z.boolean(),
-    notificarSoloUrgentes: z.boolean(),
-    notificarResumenDiario: z.boolean(),
-    notificarRechazos: z.boolean(),
-    notificarVencimientos: z.boolean(),
     temaInterfaz: z.string(),
     dashboardInicio: z.string().optional().nullable(),
     activo: z.boolean(),
@@ -248,15 +237,6 @@ export default function UsuariosList() {
         idCentroCosto: null,
         puesto: '',
         numeroEmpleado: '',
-        notificarEmail: true,
-        notificarApp: true,
-        notificarWhatsapp: false,
-        notificarSms: false,
-        notificarTelegram: false,
-        notificarSoloUrgentes: false,
-        notificarResumenDiario: true,
-        notificarRechazos: true,
-        notificarVencimientos: true,
         temaInterfaz: 'light',
         activo: true,
       },
@@ -272,7 +252,6 @@ export default function UsuariosList() {
     general: !!(errors.samAccountName || errors.nombreCompleto || errors.correo || errors.rolesIds),
     trabajo: !!(errors.detalle?.idEmpresa || errors.detalle?.idSucursal || errors.detalle?.puesto),
     contacto: false,
-    notificaciones: false,
   }), [errors]);
 
   const permisosPorCategoria = useMemo(() => {
@@ -343,16 +322,6 @@ export default function UsuariosList() {
         telefonoOficina: usuario.detalle?.telefonoOficina || '',
         extension: usuario.detalle?.extension || '',
         celular: usuario.detalle?.celular || '',
-        telegramChat: usuario.detalle?.telegramChat || '',
-        notificarEmail: usuario.detalle?.notificarEmail ?? true,
-        notificarApp: usuario.detalle?.notificarApp ?? true,
-        notificarWhatsapp: usuario.detalle?.notificarWhatsapp ?? false,
-        notificarSms: usuario.detalle?.notificarSms ?? false,
-        notificarTelegram: usuario.detalle?.notificarTelegram ?? false,
-        notificarSoloUrgentes: usuario.detalle?.notificarSoloUrgentes ?? false,
-        notificarResumenDiario: usuario.detalle?.notificarResumenDiario ?? true,
-        notificarRechazos: usuario.detalle?.notificarRechazos ?? true,
-        notificarVencimientos: usuario.detalle?.notificarVencimientos ?? true,
         temaInterfaz: usuario.detalle?.temaInterfaz || 'light',
         dashboardInicio: usuario.detalle?.dashboardInicio || '',
         activo: usuario.detalle?.activo ?? true,
@@ -602,7 +571,7 @@ export default function UsuariosList() {
         <Form {...form}>
           <form className="space-y-6">
             <Tabs defaultValue="general" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="general" className="gap-1.5">
                   General
                   {tabErrors.general && <span className="h-2 w-2 rounded-full bg-destructive" />}
@@ -612,7 +581,6 @@ export default function UsuariosList() {
                   {tabErrors.trabajo && <span className="h-2 w-2 rounded-full bg-destructive" />}
                 </TabsTrigger>
                 <TabsTrigger value="contacto">Contacto</TabsTrigger>
-                <TabsTrigger value="notificaciones">Alertas</TabsTrigger>
               </TabsList>
 
               <TabsContent value="general" className="space-y-4 pt-4">
@@ -871,116 +839,6 @@ export default function UsuariosList() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="detalle.telegramChat"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Telegram Chat ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="ID numérico" {...field} value={field.value || ''} />
-                        </FormControl>
-                        <FormDescription>Para alertas vía bot.</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="notificaciones" className="space-y-4 pt-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <Smartphone className="h-4 w-4" /> Canales Activos
-                    </h3>
-                    <FormField
-                      control={form.control}
-                      name="detalle.notificarEmail"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <FormLabel className="font-normal text-xs">Correo Electrónico</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="detalle.notificarApp"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <FormLabel className="font-normal text-xs">Notificaciones App</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="detalle.notificarWhatsapp"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <FormLabel className="font-normal text-xs">WhatsApp</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="detalle.notificarTelegram"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <FormLabel className="font-normal text-xs">Telegram</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <Bell className="h-4 w-4" /> Tipos de Alerta
-                    </h3>
-                    <FormField
-                      control={form.control}
-                      name="detalle.notificarRechazos"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <FormLabel className="font-normal text-xs">Avisar sobre Rechazos</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="detalle.notificarResumenDiario"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <FormLabel className="font-normal text-xs">Resumen Diario (8 AM)</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="detalle.notificarVencimientos"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <FormLabel className="font-normal text-xs">Alertas de Vencimiento</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="detalle.notificarSoloUrgentes"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <FormLabel className="font-normal text-xs">Solo Urgentes (Firma 5)</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
                 </div>
               </TabsContent>
             </Tabs>

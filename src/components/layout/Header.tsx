@@ -15,15 +15,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Building2, MapPin, Layers, User, LogOut, Sun, Moon, Monitor, PenLine, AlertTriangle } from 'lucide-react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { useState } from 'react';
-import CambiarUbicacionModal from './CambiarUbicacionModal';
 
 export const Header = () => {
   const { user, empresa, sucursal, area, hasFirma, logout } = useAuthStore();
   const { title, subtitle } = usePageStore();
   const { ui, setTema } = useConfigStore();
   const navigate = useNavigate();
-  const [modalOpen, setModalOpen] = useState(false);
 
   const handleThemeChange = (tema: string) => {
     if (tema === 'light' || tema === 'dark' || tema === 'system') {
@@ -48,40 +45,10 @@ export const Header = () => {
   };
 
   return (
-    <header className={`h-16 bg-card relative flex items-center justify-between px-4 sm:px-6 ${hasFirma === false ? 'border-b-2 border-amber-400 dark:border-amber-500' : 'border-b border-border'}`}>
-      {/* Left side: Toggle + Location Info (hidden on mobile) */}
+    <header className="h-16 bg-card relative flex items-center justify-between px-4 sm:px-6 border-b border-border">
+      {/* Left side: Toggle */}
       <div className="flex items-center gap-4">
         <SidebarTrigger />
-
-        {/* Empresa + Sucursal: md+ only */}
-        <div className="hidden md:flex items-center gap-4">
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-2 text-sm">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-            <span className="text-foreground font-medium">{empresa?.nombre || 'Sin empresa'}</span>
-          </div>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-2 text-sm">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">{sucursal?.nombre || 'Sin sucursal'}</span>
-          </div>
-          {area && (
-            <>
-              <div className="h-4 w-px bg-border" />
-              <div className="flex items-center gap-2 text-sm">
-                <Layers className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">{area.nombre}</span>
-              </div>
-            </>
-          )}
-        </div>
-
-        {hasFirma === false && (
-          <div className="hidden md:flex items-center gap-1.5 rounded-full border border-amber-400 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-0.5 text-xs text-amber-700 dark:text-amber-400">
-            <PenLine className="h-3 w-3" />
-            <span>Sin firma digital</span>
-          </div>
-        )}
       </div>
 
       {/* Center: Page Title (md+ only) */}
@@ -94,7 +61,7 @@ export const Header = () => {
         </div>
       )}
 
-      {/* Right side: Theme + Notifications + User Menu */}
+      {/* Right side: Theme + User Menu */}
       <div className="flex items-center gap-2">
         {/* Theme Dropdown */}
         <DropdownMenu>
@@ -182,10 +149,6 @@ export const Header = () => {
               <User className="mr-2 h-4 w-4" />
               <span>Configuración</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setModalOpen(true)}>
-              <Building2 className="mr-2 h-4 w-4" />
-              <span>Cambiar Ubicación</span>
-            </DropdownMenuItem>
 
             <DropdownMenuSeparator />
 
@@ -196,8 +159,6 @@ export const Header = () => {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-
-      <CambiarUbicacionModal open={modalOpen} onOpenChange={setModalOpen} />
     </header>
   );
 };

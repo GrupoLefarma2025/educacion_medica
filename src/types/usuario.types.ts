@@ -13,16 +13,6 @@ export interface UsuarioDetalle {
   telefonoOficina?: string;
   extension?: string;
   celular?: string;
-  telegramChat?: string;
-  notificarEmail: boolean;
-  notificarApp: boolean;
-  notificarWhatsapp: boolean;
-  notificarSms: boolean;
-  notificarTelegram: boolean;
-  notificarSoloUrgentes: boolean;
-  notificarResumenDiario: boolean;
-  notificarRechazos: boolean;
-  notificarVencimientos: boolean;
   idUsuarioDelegado?: number;
   delegacionHasta?: string;
   avatarUrl?: string;

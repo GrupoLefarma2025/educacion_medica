@@ -10,7 +10,7 @@ function normalizeCodes(codes: string | string[]): string[] {
 
 /**
  * Reactive permission check hook.
- * Uses the Zustand auth store so it updates when permissions change (e.g. via SSE).
+ * Uses the Zustand auth store so it updates when permissions change.
  *
  * Evaluation order:
  * 1. `exclude` — if the user has ANY excluded permission → deny

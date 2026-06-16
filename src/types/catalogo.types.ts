@@ -155,7 +155,6 @@ export interface ProveedorCuentaBancaria {
   clabe?: string;
   numeroTarjeta?: string;
   beneficiario?: string;
-  correoNotificacion?: string;
   activo: boolean;
   tieneOrdenes?: boolean;
 }

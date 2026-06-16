@@ -1,5 +1,4 @@
-﻿import type { SseUserInfo } from './sse.types';
-import type { Area } from './catalogo.types';
+﻿import type { Area } from './catalogo.types';
 
 
 // User info from backend (matches UserInfo in backend DTOs)
@@ -142,7 +141,4 @@ export interface AuthState {
   // Firma signature actions
   setHasFirma: (has: boolean) => void;
   fetchProfileSignature: () => Promise<void>;
-
-  // SSE
-  updateUserFromSse: (sseUser: SseUserInfo) => void;
 }

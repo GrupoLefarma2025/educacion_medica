@@ -44,15 +44,15 @@ export const AppRoutes = () => {
           <Route path="/seguridad/permisos" element={<PermisosList />} />
 
           {/* Catálogos */}
-          {/* <Route path="/catalogos/empresas" element={<PermissionGuard requireAny={['empresas.ver_listado']}><EmpresasList /></PermissionGuard>} />
+          <Route path="/catalogos/empresas" element={<PermissionGuard requireAny={['empresas.ver_listado']}><EmpresasList /></PermissionGuard>} />
+          <Route path="/catalogos/sucursales" element={<PermissionGuard requireAny={['sucursales.ver_listado']}><SucursalesList /></PermissionGuard>} />
           <Route path="/catalogos/area" element={<PermissionGuard requireAny={['areas.ver_listado']}><AreasList /></PermissionGuard>} />
-          <Route path="/catalogos/formas-pago" element={<PermissionGuard requireAny={['formas-pago.ver_listado']}><FormasPagoList /></PermissionGuard>} />
+          {/*<Route path="/catalogos/formas-pago" element={<PermissionGuard requireAny={['formas-pago.ver_listado']}><FormasPagoList /></PermissionGuard>} />
           <Route path="/catalogos/tipos-impuesto" element={<PermissionGuard requireAny={['tipos-impuesto.ver_listado']}><TiposImpuestoList /></PermissionGuard>} />
           <Route path="/catalogos/centros-costo" element={<PermissionGuard requireAny={['centros-costo.ver_listado']}><CentrosCostoList /></PermissionGuard>} />
           <Route path="/catalogos/cuentas-contables" element={<PermissionGuard requireAny={['cuentas-contables.ver_listado']}><CuentasContablesList /></PermissionGuard>} />
           <Route path="/catalogos/estatus-orden" element={<PermissionGuard requireAny={['estatus-orden.ver_listado']}><EstatusOrdenList /></PermissionGuard>} />
           <Route path="/catalogos/regimenes-fiscales" element={<PermissionGuard requireAny={['regimenes-fiscales.ver_listado']}><RegimenesFiscalesList /></PermissionGuard>} />
-          <Route path="/catalogos/sucursales" element={<PermissionGuard requireAny={['sucursales.ver_listado']}><SucursalesList /></PermissionGuard>} />
           <Route path="/catalogos/medidas" element={<PermissionGuard requireAny={['medidas.ver_listado']}><MedidasList /></PermissionGuard>} />
           <Route path="/catalogos/tipos-gasto" element={<PermissionGuard requireAny={['tipos-gasto.ver_listado']}><TiposGastoList /></PermissionGuard>} /> */}
 

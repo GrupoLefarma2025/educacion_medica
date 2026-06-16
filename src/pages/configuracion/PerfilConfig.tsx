@@ -10,8 +10,6 @@ import { Usuario } from '@/types/usuario.types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Form,
   FormControl,
@@ -19,9 +17,8 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from '@/components/ui/form';
-import { /* User, */ /* Mail, */ Phone, Bell, Loader2, Smartphone, PenLine, Upload, /* Trash2, */ ImagePlus, /* X, */ Crop, RotateCcwIcon } from 'lucide-react';
+import { /* User, */ /* Mail, */ Phone, Loader2, Smartphone, PenLine, Upload, /* Trash2, */ ImagePlus, /* X, */ Crop, RotateCcwIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import {
@@ -46,23 +43,13 @@ const perfilSchema = z.object({
     celular: z.string().optional().nullable(),
     telefonoOficina: z.string().optional().nullable(),
     extension: z.string().optional().nullable(),
-    telegramChat: z.string().optional().nullable(),
-    notificarEmail: z.boolean(),
-    notificarApp: z.boolean(),
-    notificarWhatsapp: z.boolean(),
-    notificarSms: z.boolean(),
-    notificarTelegram: z.boolean(),
-    notificarSoloUrgentes: z.boolean(),
-    notificarResumenDiario: z.boolean(),
-    notificarRechazos: z.boolean(),
-    notificarVencimientos: z.boolean(),
   }),
 });
 
 type PerfilFormValues = z.infer<typeof perfilSchema>;
 
 export function PerfilConfig() {
-  usePageTitle('Mi Perfil', 'Configuración de tu perfil y notificaciones');
+  usePageTitle('Mi Perfil', 'Configuración de tu perfil');
   const { user, hasFirma, fetchProfileSignature } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -84,16 +71,6 @@ export function PerfilConfig() {
         celular: '',
         telefonoOficina: '',
         extension: '',
-        telegramChat: '',
-        notificarEmail: true,
-        notificarApp: true,
-        notificarWhatsapp: false,
-        notificarSms: false,
-        notificarTelegram: false,
-        notificarSoloUrgentes: false,
-        notificarResumenDiario: true,
-        notificarRechazos: true,
-        notificarVencimientos: true,
       },
     },
   });
@@ -205,16 +182,6 @@ export function PerfilConfig() {
             celular: u.detalle?.celular || '',
             telefonoOficina: u.detalle?.telefonoOficina || '',
             extension: u.detalle?.extension || '',
-            telegramChat: u.detalle?.telegramChat || '',
-            notificarEmail: u.detalle?.notificarEmail ?? true,
-            notificarApp: u.detalle?.notificarApp ?? true,
-            notificarWhatsapp: u.detalle?.notificarWhatsapp ?? false,
-            notificarSms: u.detalle?.notificarSms ?? false,
-            notificarTelegram: u.detalle?.notificarTelegram ?? false,
-            notificarSoloUrgentes: u.detalle?.notificarSoloUrgentes ?? false,
-            notificarResumenDiario: u.detalle?.notificarResumenDiario ?? true,
-            notificarRechazos: u.detalle?.notificarRechazos ?? true,
-            notificarVencimientos: u.detalle?.notificarVencimientos ?? true,
           },
         });
         setFirmaPreviewUrl(firmaUrl);
@@ -404,84 +371,6 @@ export function PerfilConfig() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="detalle.telegramChat"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telegram Chat ID</FormLabel>
-                    <FormControl>
-                      <Input placeholder="ID numérico" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormDescription>Para alertas vía bot de Telegram.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </CardContent>
-        </Card>
-</PermissionElement>
-        {/* Notificaciones */}
-<PermissionElement require={['configuracion.editar_notificaciones_propio']}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notificaciones
-            </CardTitle>
-            <CardDescription>Configura cómo y cuándo deseas recibir alertas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div className="space-y-3">
-                <p className="text-sm font-semibold">Canales Activos</p>
-                {[
-                  { name: 'detalle.notificarEmail' as const, label: 'Correo Electrónico' },
-                  { name: 'detalle.notificarApp' as const, label: 'Notificaciones App' },
-                  { name: 'detalle.notificarWhatsapp' as const, label: 'WhatsApp' },
-                  { name: 'detalle.notificarSms' as const, label: 'SMS' },
-                  { name: 'detalle.notificarTelegram' as const, label: 'Telegram' },
-                ].map(({ name, label }) => (
-                  <FormField
-                    key={name}
-                    control={form.control}
-                    name={name}
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                        <FormLabel className="font-normal text-sm">{label}</FormLabel>
-                      </FormItem>
-                    )}
-                  />
-                ))}
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-sm font-semibold">Tipos de Alerta</p>
-                {[
-                  { name: 'detalle.notificarRechazos' as const, label: 'Avisar sobre Rechazos' },
-                  { name: 'detalle.notificarVencimientos' as const, label: 'Alertas de Vencimiento' },
-                  { name: 'detalle.notificarResumenDiario' as const, label: 'Resumen Diario (8 AM)' },
-                  { name: 'detalle.notificarSoloUrgentes' as const, label: 'Solo Urgentes' },
-                ].map(({ name, label }) => (
-                  <FormField
-                    key={name}
-                    control={form.control}
-                    name={name}
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                        <FormLabel className="font-normal text-sm">{label}</FormLabel>
-                      </FormItem>
-                    )}
-                  />
-                ))}
-              </div>
             </div>
           </CardContent>
         </Card>

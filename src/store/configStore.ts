@@ -24,15 +24,6 @@ const DEFAULT_UI_CONFIG: UIConfig = {
     },
   },
   sidebarCollapsed: false,
-  notificaciones: {
-    tiposHabilitados: ['in-app'],
-    preferencias: [
-      { tipo: 'in-app', enabled: true },
-      { tipo: 'email', enabled: false },
-      { tipo: 'telegram', enabled: false },
-      { tipo: 'whatsapp', enabled: false },
-    ],
-  },
 };
 
 const DEFAULT_SISTEMA_INFO: SistemaInfo = {
@@ -56,9 +47,6 @@ const DEFAULT_GLOBAL_CONFIG: ConfiguracionGlobal = {
   defaultDateFormat: 'DD/MM/YYYY',
   defaultTimeFormat: '24h',
   defaultPageSize: 20,
-
-  notificacionesEnabled: true,
-  notificacionesJobSchedule: '0 8 * * *', // 8:00 AM diario
 
   tipoCambioDefecto: 24.50,
   impuestoPorDefecto: 15.0,
@@ -114,7 +102,6 @@ export const useConfigStore = create<ConfigState>()(
       perfil: {
         nombre: '',
         correo: '',
-        notificacionPreferida: 'in-app',
       },
 
       sistema: DEFAULT_SISTEMA_INFO,
@@ -191,35 +178,9 @@ export const useConfigStore = create<ConfigState>()(
         }));
       },
 
-      updateNotificacion: (tipo, enabled) => {
-        set((state) => ({
-          ui: {
-            ...state.ui,
-            notificaciones: {
-              ...state.ui.notificaciones,
-              preferencias: state.ui.notificaciones.preferencias.map((p) =>
-                p.tipo === tipo ? { ...p, enabled } : p
-              ),
-              tiposHabilitados: enabled
-                ? [...new Set([...state.ui.notificaciones.tiposHabilitados, tipo])]
-                : state.ui.notificaciones.tiposHabilitados.filter((t) => t !== tipo),
-            },
-          },
-        }));
-      },
-
       setSidebarCollapsed: (collapsed: boolean) => {
         set((state) => ({
           ui: { ...state.ui, sidebarCollapsed: collapsed },
-        }));
-      },
-
-      setNotificacionPreferida: (tipo) => {
-        set((state) => ({
-          perfil: {
-            ...state.perfil,
-            notificacionPreferida: tipo,
-          },
         }));
       },
 
@@ -255,20 +216,10 @@ export const useConfigStore = create<ConfigState>()(
             visual: defaultPreset.config.visual,
             componentes: defaultPreset.config.componentes,
             sidebarCollapsed: false,
-            notificaciones: {
-              tiposHabilitados: ['in-app'],
-              preferencias: [
-                { tipo: 'in-app', enabled: true },
-                { tipo: 'email', enabled: false },
-                { tipo: 'telegram', enabled: false },
-                { tipo: 'whatsapp', enabled: false },
-              ],
-            },
           },
           perfil: {
             nombre: user?.nombre || '',
             correo: user?.correo || '',
-            notificacionPreferida: 'in-app',
           },
         });
         applyVisualPreferences(defaultPreset.config.visual);

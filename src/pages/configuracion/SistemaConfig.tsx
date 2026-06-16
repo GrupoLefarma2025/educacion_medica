@@ -2,7 +2,7 @@
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Copy, Check, Lock, Clock, HardDrive, Globe, Shield, DollarSign, FileCode, Server, Send } from 'lucide-react';
+import { Copy, Check, Lock, Clock, HardDrive, Globe, Shield, DollarSign, FileCode, Server } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { systemConfigService, BackendConfigResponse } from '@/services/systemConfigService';
 
@@ -155,50 +155,6 @@ export function SistemaConfig() {
                   </div>
                 </div>
               </div>
-
-              {/* Email Settings */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Globe className="h-4 w-4" />
-                  Configuración Email (SMTP)
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pl-6">
-                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                    <p className="text-xs text-muted-foreground">Servidor SMTP</p>
-                    <p className="text-sm font-medium">{backendConfig.email.smtpServer}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                    <p className="text-xs text-muted-foreground">Puerto</p>
-                    <p className="text-sm font-medium">{backendConfig.email.smtpPort}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                    <p className="text-xs text-muted-foreground">SSL/TLS</p>
-                    <p className="text-sm font-medium">{backendConfig.email.enableSSL ? 'Habilitado' : 'Deshabilitado'}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                    <p className="text-xs text-muted-foreground">From Email</p>
-                    <p className="text-sm font-medium">{backendConfig.email.fromEmail}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                    <p className="text-xs text-muted-foreground">From Name</p>
-                    <p className="text-sm font-medium">{backendConfig.email.fromName}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Telegram Settings */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Send className="h-4 w-4" />
-                  Configuración Telegram
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-4 pl-6">
-                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                    <p className="text-xs text-muted-foreground">API URL</p>
-                    <p className="text-sm font-mono">{backendConfig.telegram.apiUrl}</p>
-                  </div>
-                </div>
-              </div>
             </div>
           ) : (
             <p className="text-sm text-red-600">Error al cargar configuración del backend</p>
@@ -308,25 +264,17 @@ export function SistemaConfig() {
               <DollarSign className="h-4 w-4" />
               Configuración de Negocio
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
-              <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                <p className="text-xs text-muted-foreground">Tipo de Cambio (LPS/USD)</p>
-                <p className="text-sm font-medium">L{globalConfig.tipoCambioDefecto.toFixed(2)}</p>
-              </div>
-              <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                <p className="text-xs text-muted-foreground">Impuesto (ISV/IVA)</p>
-                <p className="text-sm font-medium">{globalConfig.impuestoPorDefecto}%</p>
-              </div>
-              <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                <p className="text-xs text-muted-foreground">Notificaciones Globales</p>
-                <p className="text-sm font-medium">{globalConfig.notificacionesEnabled ? 'Habilitadas' : 'Deshabilitadas'}</p>
-              </div>
-              <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                <p className="text-xs text-muted-foreground">Schedule de Job</p>
-                <p className="text-sm font-medium font-mono">{globalConfig.notificacionesJobSchedule}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+                <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                  <p className="text-xs text-muted-foreground">Tipo de Cambio (LPS/USD)</p>
+                  <p className="text-sm font-medium">L{globalConfig.tipoCambioDefecto.toFixed(2)}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                  <p className="text-xs text-muted-foreground">Impuesto (ISV/IVA)</p>
+                  <p className="text-sm font-medium">{globalConfig.impuestoPorDefecto}%</p>
+                </div>
               </div>
             </div>
-          </div>
 
           {/* Configuración de Seguridad */}
           <div className="space-y-3">

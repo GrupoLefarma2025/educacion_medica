@@ -1,7 +1,5 @@
 import type { ComponentType } from 'react';
 
-export type TipoNotificacion = 'in-app' | 'email' | 'telegram' | 'whatsapp';
-
 // Preset identifier type
 export type UIPresetId = 'compacto' | 'estandar' | 'comodo' | 'accesibilidad';
 
@@ -35,13 +33,6 @@ export interface UIPreset {
   };
 }
 
-// Preferencias de notificación
-export interface NotificacionPreference {
-  tipo: TipoNotificacion;
-  enabled: boolean;
-  config?: Record<string, string>; // Para configuración específica (ej. telegram chat_id)
-}
-
 // Configuración de UI
 export interface UIConfig {
   tema: 'light' | 'dark' | 'system';
@@ -51,11 +42,6 @@ export interface UIConfig {
   visual: VisualPreferences;
   componentes: ComponentPreferences;
   sidebarCollapsed: boolean;
-
-  notificaciones: {
-    tiposHabilitados: TipoNotificacion[];
-    preferencias: NotificacionPreference[];
-  };
 }
 
 // Configuración de perfil
@@ -63,7 +49,6 @@ export interface PerfilConfig {
   nombre: string;
   correo: string;
   telefono?: string;
-  notificacionPreferida: TipoNotificacion;
 }
 
 // Variables de entorno/sistema (solo lectura, info técnica del build)
@@ -91,10 +76,6 @@ export interface ConfiguracionGlobal {
   defaultDateFormat: string; // ej. 'DD/MM/YYYY', 'MM/DD/YYYY'
   defaultTimeFormat: '12h' | '24h';
   defaultPageSize: number; // Items por página en tablas
-
-  // Configuración de notificaciones globales
-  notificacionesEnabled: boolean; // Si las notificaciones están habilitadas globalmente
-  notificacionesJobSchedule: string; // Cron schedule para job de notificaciones
 
   // Configuración de negocio
   tipoCambioDefecto: number; // Tipo de cambio LPS a USD
@@ -128,8 +109,6 @@ export interface ConfigState {
   updateVisualPreferences: (updates: Partial<VisualPreferences>) => void;
   updateComponentPreferences: (updates: Partial<ComponentPreferences>) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  updateNotificacion: (tipo: TipoNotificacion, enabled: boolean) => void;
-  setNotificacionPreferida: (tipo: TipoNotificacion) => void;
   updatePerfil: (perfil: Partial<PerfilConfig>) => void;
   updateGlobalConfig: (config: Partial<ConfiguracionGlobal>) => void;
   resetConfig: () => void;

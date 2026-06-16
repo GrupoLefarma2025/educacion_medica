@@ -71,7 +71,7 @@ export const authService = {
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem('token'); // Legacy token key
 
-      // NO borrar configuración de usuario (empresa, sucursal, notificaciones, etc.)
+      // NO borrar configuración de usuario (empresa, sucursal, etc.)
 
       // Limpiar sessionStorage temporal
       sessionStorage.removeItem('loginFlow');

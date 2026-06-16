@@ -6,7 +6,6 @@ import {
   Sucursal,
 } from '@/types/auth.types';
 import type { Area } from '@/types/catalogo.types';
-import type { SseUserInfo } from '@/types/sse.types';
 import { navigateTo } from '@/lib/navigation';
 import { authService } from '@/services/authService';
 import { API } from '@/services/api';
@@ -125,64 +124,62 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         correo: response.user.correo || '',
       });
 
-      // Auto-resolver ubicación: si el usuario no puede elegir empresa,
-      // resolver empresa/sucursal/área desde su perfil y autenticar directo.
-      // Si puede elegir, queda autenticado y Login redirige a /select-empresa.
-      if (!puedeSeleccionar) {
-        let empresa = usuarioDetalle?.idEmpresa
-          ? (empresas.find((e) => String(e.idEmpresa) === String(usuarioDetalle.idEmpresa)) ?? null)
+      // Auto-resolver ubicación para TODOS los usuarios: empresa/sucursal/área
+      // desde el perfil si existe, si no la primera disponible. Login envía al
+      // dashboard; los multi-empresa cambian después vía "Cambiar Ubicación".
+      let empresa = usuarioDetalle?.idEmpresa
+        ? (empresas.find((e) => String(e.idEmpresa) === String(usuarioDetalle.idEmpresa)) ?? null)
+        : null;
+      if (!empresa && empresas.length > 0) empresa = empresas[0];
+
+      if (empresa) {
+        const emp = empresa;
+        const sucursalesDeEmpresa = sucursales.filter(
+          (s) => String(s.idEmpresa) === String(emp.idEmpresa)
+        );
+        let sucursal = usuarioDetalle?.idSucursal
+          ? (sucursalesDeEmpresa.find((s) => String(s.idSucursal) === String(usuarioDetalle.idSucursal)) ?? null)
           : null;
-        if (!empresa && empresas.length > 0) empresa = empresas[0];
+        if (!sucursal && sucursalesDeEmpresa.length > 0) sucursal = sucursalesDeEmpresa[0];
 
-        if (empresa) {
-          const emp = empresa;
-          const sucursalesDeEmpresa = sucursales.filter(
-            (s) => String(s.idEmpresa) === String(emp.idEmpresa)
-          );
-          let sucursal = usuarioDetalle?.idSucursal
-            ? (sucursalesDeEmpresa.find((s) => String(s.idSucursal) === String(usuarioDetalle.idSucursal)) ?? null)
-            : null;
-          if (!sucursal && sucursalesDeEmpresa.length > 0) sucursal = sucursalesDeEmpresa[0];
+        authService.setEmpresa(emp);
+        if (sucursal) authService.setSucursal(sucursal);
 
-          authService.setEmpresa(emp);
-          if (sucursal) authService.setSucursal(sucursal);
+        const areasDeEmpresa = areas.filter(
+          (a) => String(a.idEmpresa) === String(emp.idEmpresa)
+        );
+        let area = usuarioDetalle?.idArea
+          ? (areasDeEmpresa.find((a) => String(a.idArea) === String(usuarioDetalle.idArea)) ?? null)
+          : null;
+        if (!area && areasDeEmpresa.length === 1) area = areasDeEmpresa[0];
+        if (area) authService.setArea(area);
 
-          const areasDeEmpresa = areas.filter(
-            (a) => String(a.idEmpresa) === String(emp.idEmpresa)
-          );
-          let area = usuarioDetalle?.idArea
-            ? (areasDeEmpresa.find((a) => String(a.idArea) === String(usuarioDetalle.idArea)) ?? null)
-            : null;
-          if (!area && areasDeEmpresa.length === 1) area = areasDeEmpresa[0];
-          if (area) authService.setArea(area);
+        set({
+          user: response.user,
+          token: response.accessToken,
+          isAuthenticated: true,
+          isLoading: false,
+          loginStep: 1,
+          availableDomains: [],
+          requiresDomainSelection: false,
+          displayName: null,
+          pendingUsername: null,
+          empresas,
+          sucursales,
+          areas,
+          puedeSeleccionarEmpresas: puedeSeleccionar,
+          usuarioDetalle,
+          empresa: emp,
+          sucursal,
+          area,
+        });
 
-          set({
-            user: response.user,
-            token: response.accessToken,
-            isAuthenticated: true,
-            isLoading: false,
-            loginStep: 1,
-            availableDomains: [],
-            requiresDomainSelection: false,
-            displayName: null,
-            pendingUsername: null,
-            empresas,
-            sucursales,
-            areas,
-            puedeSeleccionarEmpresas: false,
-            usuarioDetalle,
-            empresa: emp,
-            sucursal,
-            area,
-          });
-
-          await get().fetchProfileSignature();
-          return;
-        }
-        // si no se pudo resolver empresa, caer al flujo de selección
+        await get().fetchProfileSignature();
+        return;
       }
+      // si no se pudo resolver empresa (lista vacía), caer al flujo de selección
 
-      // Usuario multi-empresa (o sin empresa resoluble): autenticado con token,
+      // Sin ninguna empresa disponible (caso degenerado): autenticado con token,
       // elegir ubicación en /select-empresa.
       set({
         user: response.user,
@@ -309,31 +306,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   setUser: (user: UserInfo) => {
-    localStorage.setItem('edu_med_user', JSON.stringify(user));
-    set({ user });
-  },
-
-  updateUserFromSse: (sseUser: SseUserInfo) => {
-    const user: UserInfo = {
-      id: sseUser.id,
-      username: sseUser.username,
-      nombre: sseUser.nombre,
-      correo: sseUser.correo,
-      dominio: sseUser.dominio,
-      roles: sseUser.roles.map((r) => ({
-        idRol: r.idRol,
-        nombreRol: r.nombreRol,
-        descripcion: r.descripcion,
-      })),
-      permisos: sseUser.permisos.map((p) => ({
-        idPermiso: p.idPermiso,
-        codigoPermiso: p.codigoPermiso,
-        nombrePermiso: p.nombrePermiso,
-        categoria: p.categoria,
-        recurso: p.recurso,
-        accion: p.accion,
-      })),
-    };
     localStorage.setItem('edu_med_user', JSON.stringify(user));
     set({ user });
   },
