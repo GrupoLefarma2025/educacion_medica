@@ -22,7 +22,6 @@ import CentrosCostoList from '@/pages/catalogos/generales/CentrosCosto/CentrosCo
 import CuentasContablesList from '@/pages/catalogos/generales/CuentasContables/CuentasContablesList';
 import EstatusOrdenList from '@/pages/catalogos/generales/EstatusOrden/EstatusOrdenList';
 import RegimenesFiscalesList from '@/pages/catalogos/generales/RegimenesFiscales/RegimenesFiscalesList';
-import ProveedoresList from '@/pages/catalogos/generales/Proveedores/ProveedoresList';
 import ConfiguracionGeneral from '@/pages/configuracion/ConfiguracionGeneral';
 import UsuariosList from '@/pages/admin/Usuarios/UsuariosList';
 import NotFound from '@/pages/NotFound';
@@ -52,7 +51,6 @@ export const AppRoutes = () => {
           <Route path="/catalogos/centros-costo" element={<PermissionGuard requireAny={['centros-costo.ver_listado']}><CentrosCostoList /></PermissionGuard>} />
           <Route path="/catalogos/cuentas-contables" element={<PermissionGuard requireAny={['cuentas-contables.ver_listado']}><CuentasContablesList /></PermissionGuard>} />
           <Route path="/catalogos/estatus-orden" element={<PermissionGuard requireAny={['estatus-orden.ver_listado']}><EstatusOrdenList /></PermissionGuard>} />
-          <Route path="/catalogos/proveedores" element={<PermissionGuard requireAny={['proveedores.ver_listado']}><ProveedoresList /></PermissionGuard>} />
           <Route path="/catalogos/regimenes-fiscales" element={<PermissionGuard requireAny={['regimenes-fiscales.ver_listado']}><RegimenesFiscalesList /></PermissionGuard>} />
           <Route path="/catalogos/sucursales" element={<PermissionGuard requireAny={['sucursales.ver_listado']}><SucursalesList /></PermissionGuard>} />
           <Route path="/catalogos/medidas" element={<PermissionGuard requireAny={['medidas.ver_listado']}><MedidasList /></PermissionGuard>} />

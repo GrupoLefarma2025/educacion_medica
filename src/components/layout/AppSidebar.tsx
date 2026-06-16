@@ -118,7 +118,6 @@ const menuItems: SidebarMenuItemConfig[] = [
       { title: 'Centros de Costo', icon: MapPin, path: '/catalogos/centros-costo', permission: { require: 'centros-costo.ver_listado' } },
       { title: 'Cuentas Contables', icon: FileText, path: '/catalogos/cuentas-contables', permission: { require: 'cuentas-contables.ver_listado' } },
       { title: 'Estatus de Orden', icon: List, path: '/catalogos/estatus-orden', permission: { require: 'estatus-orden.ver_listado' } },
-      { title: 'Proveedores', icon: Building, path: '/catalogos/proveedores', permission: { require: 'proveedores.ver_listado' } },
       { title: 'Regímenes Fiscales', icon: UserCircle, path: '/catalogos/regimenes-fiscales', permission: { require: 'regimenes-fiscales.ver_listado' } },
     ],
   },
