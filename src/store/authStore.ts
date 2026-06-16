@@ -125,68 +125,71 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         correo: response.user.correo || '',
       });
 
-      // Si no puede seleccionar empresas, auto-seleccionar la unica que tiene y saltar al dashboard
-      if (!puedeSeleccionar && empresas.length === 1) {
-        const unicaEmpresa = empresas[0];
-        const sucursalesDeEmpresa = sucursales.filter(
-          (s) => String(s.idEmpresa) === String(unicaEmpresa.idEmpresa)
-        );
-
-        // Usar la sucursal del detalle si existe y pertenece a la empresa,
-        // si no, usar la primera sucursal disponible de esa empresa
-        const detalleSucursalId = usuarioDetalle?.idSucursal ?? 0;
-        const sucursalDelDetalle = detalleSucursalId > 0
-          ? sucursalesDeEmpresa.find((s) => String(s.idSucursal) === String(detalleSucursalId))
+      // Auto-resolver ubicación: si el usuario no puede elegir empresa,
+      // resolver empresa/sucursal/área desde su perfil y autenticar directo.
+      // Si puede elegir, queda autenticado y Login redirige a /select-empresa.
+      if (!puedeSeleccionar) {
+        let empresa = usuarioDetalle?.idEmpresa
+          ? (empresas.find((e) => String(e.idEmpresa) === String(usuarioDetalle.idEmpresa)) ?? null)
           : null;
-        const unicaSucursal = sucursalDelDetalle
-          ?? (sucursalesDeEmpresa.length > 0 ? sucursalesDeEmpresa[0] : null);
+        if (!empresa && empresas.length > 0) empresa = empresas[0];
 
-        authService.setEmpresa(unicaEmpresa);
-        if (unicaSucursal) {
-          authService.setSucursal(unicaSucursal);
+        if (empresa) {
+          const emp = empresa;
+          const sucursalesDeEmpresa = sucursales.filter(
+            (s) => String(s.idEmpresa) === String(emp.idEmpresa)
+          );
+          let sucursal = usuarioDetalle?.idSucursal
+            ? (sucursalesDeEmpresa.find((s) => String(s.idSucursal) === String(usuarioDetalle.idSucursal)) ?? null)
+            : null;
+          if (!sucursal && sucursalesDeEmpresa.length > 0) sucursal = sucursalesDeEmpresa[0];
+
+          authService.setEmpresa(emp);
+          if (sucursal) authService.setSucursal(sucursal);
+
+          const areasDeEmpresa = areas.filter(
+            (a) => String(a.idEmpresa) === String(emp.idEmpresa)
+          );
+          let area = usuarioDetalle?.idArea
+            ? (areasDeEmpresa.find((a) => String(a.idArea) === String(usuarioDetalle.idArea)) ?? null)
+            : null;
+          if (!area && areasDeEmpresa.length === 1) area = areasDeEmpresa[0];
+          if (area) authService.setArea(area);
+
+          set({
+            user: response.user,
+            token: response.accessToken,
+            isAuthenticated: true,
+            isLoading: false,
+            loginStep: 1,
+            availableDomains: [],
+            requiresDomainSelection: false,
+            displayName: null,
+            pendingUsername: null,
+            empresas,
+            sucursales,
+            areas,
+            puedeSeleccionarEmpresas: false,
+            usuarioDetalle,
+            empresa: emp,
+            sucursal,
+            area,
+          });
+
+          await get().fetchProfileSignature();
+          return;
         }
-
-        // Mantener sucursales y areas disponibles (filtradas por empresa) para el paso 3
-        const areasDeEmpresa = areas.filter(
-          (a) => !a.idSucursal || String(a.idSucursal) === String(unicaEmpresa.idEmpresa)
-        );
-
-        set({
-          user: response.user,
-          token: response.accessToken,
-          isAuthenticated: false,
-          isLoading: false,
-          loginStep: 3,
-          availableDomains: [],
-          requiresDomainSelection: false,
-          displayName: null,
-          pendingUsername: null,
-          empresas,
-          sucursales,
-          areas,
-          puedeSeleccionarEmpresas: false,
-          usuarioDetalle,
-          empresa: unicaEmpresa,
-          sucursal: unicaSucursal,
-          area: areasDeEmpresa.length === 1 ? areasDeEmpresa[0] : null,
-        });
-
-        useConfigStore.getState().updatePerfil({
-          nombre: response.user.nombre || '',
-          correo: response.user.correo || '',
-        });
-
-        await get().fetchProfileSignature();
-        return;
+        // si no se pudo resolver empresa, caer al flujo de selección
       }
 
-      // Si puede seleccionar, mostrar pantalla de seleccion
+      // Usuario multi-empresa (o sin empresa resoluble): autenticado con token,
+      // elegir ubicación en /select-empresa.
       set({
         user: response.user,
         token: response.accessToken,
-        isAuthenticated: false,
+        isAuthenticated: true,
         isLoading: false,
-        loginStep: 3,
+        loginStep: 1,
         availableDomains: [],
         requiresDomainSelection: false,
         displayName: null,

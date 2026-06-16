@@ -142,6 +142,24 @@ export interface Banco {
   activo: boolean;
 }
 
+// ─── Proveedor Cuenta Bancaria ────────────────────────────────────────────────
+
+export interface ProveedorCuentaBancaria {
+  idCuen: number;
+  idProveedor: number;
+  idFormaPago: number;
+  idBanco?: number;
+  formaPagoNombre?: string;
+  bancoNombre?: string;
+  numeroCuenta?: string;
+  clabe?: string;
+  numeroTarjeta?: string;
+  beneficiario?: string;
+  correoNotificacion?: string;
+  activo: boolean;
+  tieneOrdenes?: boolean;
+}
+
 // ─── Moneda ───────────────────────────────────────────────────────────────────
 
 export interface Moneda {
